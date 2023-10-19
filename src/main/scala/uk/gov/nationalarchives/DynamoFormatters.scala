@@ -4,6 +4,7 @@ import cats.data._
 import cats.implicits._
 import org.scanamo._
 import org.scanamo.generic.semiauto._
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue.Type._
 
 import java.util.UUID
 import scala.jdk.CollectionConverters._
@@ -47,16 +48,16 @@ object DynamoFormatters {
         folderRowAsMap
           .get(name)
           .map { attributeValue =>
-            Option(attributeValue.n()) match {
-              case None =>
-                (name -> NoPropertyOfType("Number", DynamoValue.fromAttributeValue(attributeValue))).invalidNel
-              case Some(value) =>
+            attributeValue.`type`() match {
+              case N =>
+                val value = attributeValue.n()
                 val potentiallyConvertedValue = Try(toNumberFunction(value))
                 if (potentiallyConvertedValue.isSuccess) potentiallyConvertedValue.toOption.validNel
                 else
                   (name -> TypeCoercionError(
                     new RuntimeException(s"Cannot parse $value for field $name into ${classTag.runtimeClass}")
                   )).invalidNel
+              case _ => (name -> NoPropertyOfType("Number", DynamoValue.fromAttributeValue(attributeValue))).invalidNel
             }
           }
           .getOrElse(None.validNel)
