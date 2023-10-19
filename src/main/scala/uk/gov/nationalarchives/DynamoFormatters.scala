@@ -37,10 +37,10 @@ object DynamoFormatters {
 
   implicit val dynamoTableFormat: DynamoFormat[DynamoTable] = new DynamoFormat[DynamoTable] {
     override def read(dynamoValue: DynamoValue): Either[DynamoReadError, DynamoTable] = {
-      val map = dynamoValue.toAttributeValue.m().asScala
+      val folderRowAsMap = dynamoValue.toAttributeValue.m().asScala
 
       def readNumber[T](name: String, toNumberFunction: String => T): ValidatedNel[InvalidProperty, Option[T]] = {
-        map
+        folderRowAsMap
           .get(name)
           .map { value =>
             Option(value.n()) match {
@@ -58,7 +58,7 @@ object DynamoFormatters {
         .map(_.validNel)
         .getOrElse((name -> MissingProperty).invalidNel)
 
-      def value(name: String) = map.get(name).map(_.s())
+      def value(name: String) = folderRowAsMap.get(name).map(_.s())
 
       (
         valueOrInvalid(batchId),
@@ -68,7 +68,7 @@ object DynamoFormatters {
         readNumber(fileSize, _.toLong),
         readNumber(sortOrder, _.toInt)
       ).mapN { (batchId, id, name, typeName, fileSize, sortOrder) =>
-        val identifiers = map.collect {
+        val identifiers = folderRowAsMap.collect {
           case (name, value) if name.startsWith("id_") => Identifier(name.drop(3), value.s())
         }.toList
         DynamoTable(
