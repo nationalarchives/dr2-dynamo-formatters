@@ -7,6 +7,7 @@ import org.scanamo.generic.semiauto._
 
 import java.util.UUID
 import scala.jdk.CollectionConverters._
+import scala.reflect.ClassTag
 import scala.util.Try
 
 object DynamoFormatters {
@@ -31,58 +32,67 @@ object DynamoFormatters {
       case Some("ContentFolder") => ContentFolder.validNel
       case Some("Asset")         => Asset.validNel
       case Some("File")          => File.validNel
-      case Some(typeString) => (typeField -> TypeCoercionError(new Exception(s"Type $typeString not found"))).invalidNel
-      case None             => (typeField -> MissingProperty).invalidNel
+      case Some(otherTypeString) =>
+        (typeField -> TypeCoercionError(new Exception(s"Type $otherTypeString not found"))).invalidNel
+      case None => (typeField -> MissingProperty).invalidNel
     }
 
   implicit val dynamoTableFormat: DynamoFormat[DynamoTable] = new DynamoFormat[DynamoTable] {
     override def read(dynamoValue: DynamoValue): Either[DynamoReadError, DynamoTable] = {
-      val folderRowAsMap = dynamoValue.toAttributeValue.m().asScala
+      val folderRowAsMap = dynamoValue.toAttributeValue.m().asScala.toMap
 
-      def readNumber[T](name: String, toNumberFunction: String => T): ValidatedNel[InvalidProperty, Option[T]] = {
+      def getPotentialNumber[T](name: String, toNumberFunction: String => T)(implicit
+          classTag: ClassTag[T]
+      ): ValidatedNel[InvalidProperty, Option[T]] = {
         folderRowAsMap
           .get(name)
-          .map { value =>
-            Option(value.n()) match {
-              case Some(value) if Try(toNumberFunction(value)).isSuccess => Option(toNumberFunction(value)).validNel
-              case None => (name -> NoPropertyOfType("Number", DynamoValue.fromAttributeValue(value))).invalidNel
+          .map { attributeValue =>
+            Option(attributeValue.n()) match {
+              case None =>
+                (name -> NoPropertyOfType("Number", DynamoValue.fromAttributeValue(attributeValue))).invalidNel
               case Some(value) =>
-                (name -> TypeCoercionError(
-                  new RuntimeException(s"Cannot parse $value for field $name to a number")
-                )).invalidNel
+                val potentiallyConvertedValue = Try(toNumberFunction(value))
+                if (potentiallyConvertedValue.isSuccess) potentiallyConvertedValue.toOption.validNel
+                else
+                  (name -> TypeCoercionError(
+                    new RuntimeException(s"Cannot parse $value for field $name into ${classTag.runtimeClass}")
+                  )).invalidNel
             }
           }
           .getOrElse(None.validNel)
       }
-      def valueOrInvalid(name: String): ValidatedNel[InvalidProperty, String] = value(name)
-        .map(_.validNel)
-        .getOrElse((name -> MissingProperty).invalidNel)
 
-      def value(name: String) = folderRowAsMap.get(name).map(_.s())
+      def getValidatedMandatoryFieldAsString(name: String): ValidatedNel[InvalidProperty, String] =
+        getPotentialStringValue(name)
+          .map(_.validNel)
+          .getOrElse((name -> MissingProperty).invalidNel)
+
+      def getPotentialStringValue(name: String) = folderRowAsMap.get(name).map(_.s())
 
       (
-        valueOrInvalid(batchId),
-        valueOrInvalid(id),
-        valueOrInvalid(name),
-        stringToType(value(typeField)),
-        readNumber(fileSize, _.toLong),
-        readNumber(sortOrder, _.toInt)
+        getValidatedMandatoryFieldAsString(batchId),
+        getValidatedMandatoryFieldAsString(id),
+        getValidatedMandatoryFieldAsString(name),
+        stringToType(getPotentialStringValue(typeField)),
+        getPotentialNumber(fileSize, _.toLong),
+        getPotentialNumber(sortOrder, _.toInt)
       ).mapN { (batchId, id, name, typeName, fileSize, sortOrder) =>
         val identifiers = folderRowAsMap.collect {
           case (name, value) if name.startsWith("id_") => Identifier(name.drop(3), value.s())
         }.toList
+
         DynamoTable(
           batchId,
           UUID.fromString(id),
-          value(parentPath),
+          getPotentialStringValue(parentPath),
           name,
           typeName,
-          value(title),
-          value(description),
+          getPotentialStringValue(title),
+          getPotentialStringValue(description),
           sortOrder,
           fileSize,
-          value(checksumSha256),
-          value(fileExtension),
+          getPotentialStringValue(checksumSha256),
+          getPotentialStringValue(fileExtension),
           identifiers
         )
       }.toEither
@@ -104,9 +114,10 @@ object DynamoFormatters {
         checksumSha256 -> t.checksumSha256.map(DynamoValue.fromString),
         fileExtension -> t.fileExtension.map(DynamoValue.fromString)
       ) ++ t.identifiers.map(id => s"id_${id.identifierName}" -> Option(DynamoValue.fromString(id.value))).toMap
-      val values = for {
-        (fieldName, Some(potentialValue)) <- potentialValues
-      } yield fieldName -> potentialValue
+      val values = potentialValues.flatMap {
+        case (fieldName, Some(potentialValue)) => Map(fieldName -> potentialValue)
+        case _                                 => Map.empty
+      }
       DynamoObject(values).toDynamoValue
     }
   }

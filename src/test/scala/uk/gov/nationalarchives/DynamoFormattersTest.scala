@@ -73,12 +73,12 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     (invalidNumericField(fileSize), "'fileSize': not of type: 'Number' was 'DynString(1)'"),
     (
       invalidNumericValue(fileSize),
-      "'fileSize': could not be converted to desired type: java.lang.RuntimeException: Cannot parse NaN for field fileSize to a number"
+      "'fileSize': could not be converted to desired type: java.lang.RuntimeException: Cannot parse NaN for field fileSize into long"
     ),
     (invalidNumericField(sortOrder), "'sortOrder': not of type: 'Number' was 'DynString(1)'"),
     (
       invalidNumericValue(sortOrder),
-      "'sortOrder': could not be converted to desired type: java.lang.RuntimeException: Cannot parse NaN for field sortOrder to a number"
+      "'sortOrder': could not be converted to desired type: java.lang.RuntimeException: Cannot parse NaN for field sortOrder into int"
     ),
     (
       invalidTypeAttributeValue,
