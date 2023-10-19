@@ -111,7 +111,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     res.fileSize.get should equal(1)
     res.checksumSha256.get should equal("testChecksumSha256")
     res.fileExtension.get should equal("testFileExtension")
-    res.identifiers should equal(List(Identifier("Test", "testIdentifier"), Identifier("Test2", "testIdentifier2")))
+    res.identifiers should equal(List(Identifier("Test2", "testIdentifier2"), Identifier("Test", "testIdentifier")))
   }
 
   "dynamoTableFormat write" should "write all mandatory fields and ignore any optional ones" in {

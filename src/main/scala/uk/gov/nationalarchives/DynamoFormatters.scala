@@ -68,12 +68,9 @@ object DynamoFormatters {
         readNumber(fileSize, _.toLong),
         readNumber(sortOrder, _.toInt)
       ).mapN { (batchId, id, name, typeName, fileSize, sortOrder) =>
-        val identifiers = map
-          .filter(_._1.startsWith("id_"))
-          .map { case (name, value) =>
-            Identifier(name.drop(3), value.s())
-          }
-          .toList
+        val identifiers = map.collect {
+          case (name, value) if name.startsWith("id_") => Identifier(name.drop(3), value.s())
+        }.toList
         DynamoTable(
           batchId,
           UUID.fromString(id),
