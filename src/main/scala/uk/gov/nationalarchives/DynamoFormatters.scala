@@ -22,7 +22,7 @@ object DynamoFormatters {
   val parentPath = "parentPath"
   val title = "title"
   val description = "description"
-  val checksumSha256 = "checksumSha256"
+  val checksumSha256 = "checksum_sha256"
   val fileExtension = "fileExtension"
 
   private type InvalidProperty = (String, DynamoReadError)

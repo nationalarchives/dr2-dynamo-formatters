@@ -155,7 +155,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     resultMap(description).s() should equal(description)
     resultMap(sortOrder).n() should equal("1")
     resultMap(fileSize).n() should equal("2")
-    resultMap(checksumSha256).s() should equal("checksumSha256")
+    resultMap(checksumSha256).s() should equal("checksum_sha256")
     resultMap(fileExtension).s() should equal(fileExtension)
     resultMap("id_Test1").s() should equal("Value1")
     resultMap("id_Test2").s() should equal("Value2")
