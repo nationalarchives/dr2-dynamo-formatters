@@ -155,6 +155,20 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     }
   }
 
+  "allFieldsPopulated" should "contain all of the fields in DynamoTable" in {
+    val dynamoTableFields = generateDynamoTable().productElementNames.toList
+    val dynamoTableFieldsMapped = dynamoTableFields.map {
+      case "identifiers"    => "id_Test"
+      case "checksumSha256" => "checksum_sha256"
+      case theRest          => theRest
+    }
+
+    val allDynamoFieldsAccountedFor =
+      dynamoTableFieldsMapped.filterNot(dynamoTableField => allFieldsPopulated.contains(dynamoTableField))
+
+    allDynamoFieldsAccountedFor should equal(Nil)
+  }
+
   "dynamoTableFormat read" should "return a valid object when all fields are populated" in {
     val res = dynamoTableFormat.read(buildAttributeValue(allFieldsPopulated)).value
 
