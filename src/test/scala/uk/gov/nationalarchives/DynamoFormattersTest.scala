@@ -7,6 +7,7 @@ import org.scalatest.matchers.should.Matchers._
 import org.scalatest.prop.{TableDrivenPropertyChecks, TableFor2}
 import org.scanamo._
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue._
 import uk.gov.nationalarchives.DynamoFormatters._
 
 import java.time.OffsetDateTime
@@ -17,28 +18,28 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
 
   val allFieldsPopulated: Map[String, AttributeValue] = {
     Map(
-      batchId -> AttributeValue.fromS("testBatchId"),
-      id -> AttributeValue.fromS(UUID.randomUUID().toString),
-      parentPath -> AttributeValue.fromS("testParentPath"),
-      name -> AttributeValue.fromS("testName"),
-      typeField -> AttributeValue.fromS("ArchiveFolder"),
-      transferringBody -> AttributeValue.fromS("testTransferringBody"),
-      transferCompleteDatetime -> AttributeValue.fromS("2023-06-01T00:00Z"),
-      upstreamSystem -> AttributeValue.fromS("testUpstreamSystem"),
-      digitalAssetSource -> AttributeValue.fromS("testDigitalAssetSource"),
-      digitalAssetSubtype -> AttributeValue.fromS("testDigitalAssetSubtype"),
-      originalFiles -> AttributeValue.fromL(List(AttributeValue.fromS("dec2b921-20e3-41e8-a299-f3cbc13131a2")).asJava),
-      originalMetadataFiles -> AttributeValue.fromL(
-        List(AttributeValue.fromS("3f42e3f2-fffe-4fe9-87f7-262e95b86d75")).asJava
+      batchId -> fromS("testBatchId"),
+      id -> fromS(UUID.randomUUID().toString),
+      parentPath -> fromS("testParentPath"),
+      name -> fromS("testName"),
+      typeField -> fromS("ArchiveFolder"),
+      transferringBody -> fromS("testTransferringBody"),
+      transferCompleteDatetime -> fromS("2023-06-01T00:00Z"),
+      upstreamSystem -> fromS("testUpstreamSystem"),
+      digitalAssetSource -> fromS("testDigitalAssetSource"),
+      digitalAssetSubtype -> fromS("testDigitalAssetSubtype"),
+      originalFiles -> fromL(List(fromS("dec2b921-20e3-41e8-a299-f3cbc13131a2")).asJava),
+      originalMetadataFiles -> fromL(
+        List(fromS("3f42e3f2-fffe-4fe9-87f7-262e95b86d75")).asJava
       ),
-      title -> AttributeValue.fromS("testTitle"),
-      description -> AttributeValue.fromS("testDescription"),
-      sortOrder -> AttributeValue.fromN("2"),
-      fileSize -> AttributeValue.fromN("1"),
-      checksumSha256 -> AttributeValue.fromS("testChecksumSha256"),
-      fileExtension -> AttributeValue.fromS("testFileExtension"),
-      "id_Test" -> AttributeValue.fromS("testIdentifier"),
-      "id_Test2" -> AttributeValue.fromS("testIdentifier2")
+      title -> fromS("testTitle"),
+      description -> fromS("testDescription"),
+      sortOrder -> fromN("2"),
+      fileSize -> fromN("1"),
+      checksumSha256 -> fromS("testChecksumSha256"),
+      fileExtension -> fromS("testFileExtension"),
+      "id_Test" -> fromS("testIdentifier"),
+      "id_Test2" -> fromS("testIdentifier2")
     )
   }
 
@@ -59,42 +60,42 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       (originalFiles, "dec2b921-20e3-41e8-a299-f3cbc13131a2"),
       (originalMetadataFiles, "3f42e3f2-fffe-4fe9-87f7-262e95b86d75")
     ).map { case (name, value) =>
-      if (name.endsWith("Files")) name -> AttributeValue.fromL(List(AttributeValue.fromS(value)).asJava)
-      else name -> AttributeValue.fromS(value)
+      if (name.endsWith("Files")) name -> fromL(List(fromS(value)).asJava)
+      else name -> fromS(value)
     }.toMap +
-      (typeField -> AttributeValue.fromS(typeValue))
+      (typeField -> fromS(typeValue))
   }
 
   def invalidNumericField(fieldName: String): AttributeValue = buildAttributeValue(
-    allFieldsPopulated + (fieldName -> AttributeValue.fromS("1"))
+    allFieldsPopulated + (fieldName -> fromS("1"))
   )
   def invalidNumericValue(fieldName: String): AttributeValue = buildAttributeValue(
-    allFieldsPopulated + (fieldName -> AttributeValue.fromN("NaN"))
+    allFieldsPopulated + (fieldName -> fromN("NaN"))
   )
 
   def invalidListOfStringsValue(fieldName: String): AttributeValue = buildAttributeValue(
     allFieldsPopulated + (
-      fieldName -> AttributeValue.fromL(List(AttributeValue.fromS("aString"), AttributeValue.fromN("1")).asJava)
+      fieldName -> fromL(List(fromS("aString"), fromN("1")).asJava)
     )
   )
 
   def stringValueInListIsNotConvertable(fieldName: String): AttributeValue = buildAttributeValue(
     allFieldsPopulated + (
-      fieldName -> AttributeValue.fromL(
-        List(AttributeValue.fromS("dec2b921-20e3-41e8-a299-f3cbc13131a2"), AttributeValue.fromS("notAUuid")).asJava
+      fieldName -> fromL(
+        List(fromS("dec2b921-20e3-41e8-a299-f3cbc13131a2"), fromS("notAUuid")).asJava
       )
     )
   )
 
   def stringValueIsNotConvertible(fieldName: String): AttributeValue = buildAttributeValue(
-    allFieldsPopulated + (fieldName -> AttributeValue.fromS("notAConvertibleString"))
+    allFieldsPopulated + (fieldName -> fromS("notAConvertibleString"))
   )
 
   def invalidTypeAttributeValue: AttributeValue =
     AttributeValue.builder().m(allMandatoryFieldsMap("Invalid").asJava).build()
 
   def missingFieldsInvalidNumericField(invalidNumericField: String, missingFields: String*): AttributeValue =
-    buildAttributeValue(missingFieldsMap(missingFields: _*) + (invalidNumericField -> AttributeValue.fromS("1")))
+    buildAttributeValue(missingFieldsMap(missingFields: _*) + (invalidNumericField -> fromS("1")))
 
   def missingFieldsMap(fieldsToExclude: String*): Map[String, AttributeValue] = allMandatoryFieldsMap("ArchiveFolder")
     .filterNot(fields => fieldsToExclude.contains(fields._1))
@@ -263,14 +264,14 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
 
   "pkFormat read" should "read the correct fields" in {
     val uuid = UUID.randomUUID()
-    val input = AttributeValue.fromM(Map(id -> AttributeValue.fromS(uuid.toString)).asJava)
+    val input = fromM(Map(id -> fromS(uuid.toString)).asJava)
     val res = pkFormat.read(input).value
     res.id should equal(uuid)
   }
 
   "pkFormat read" should "error if the field is missing" in {
     val uuid = UUID.randomUUID()
-    val input = AttributeValue.fromM(Map("invalid" -> AttributeValue.fromS(uuid.toString)).asJava)
+    val input = fromM(Map("invalid" -> fromS(uuid.toString)).asJava)
     val res = pkFormat.read(input)
     res.isLeft should be(true)
     val isMissingPropertyError = res.left.value.asInstanceOf[InvalidPropertiesError].errors.head._2 match {
