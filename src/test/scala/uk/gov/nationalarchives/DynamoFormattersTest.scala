@@ -7,8 +7,10 @@ import org.scalatest.matchers.should.Matchers._
 import org.scalatest.prop.{TableDrivenPropertyChecks, TableFor2}
 import org.scanamo._
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue._
 import uk.gov.nationalarchives.DynamoFormatters._
 
+import java.time.OffsetDateTime
 import java.util.UUID
 import scala.jdk.CollectionConverters._
 
@@ -16,19 +18,26 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
 
   val allFieldsPopulated: Map[String, AttributeValue] = {
     Map(
-      batchId -> AttributeValue.fromS("testBatchId"),
-      id -> AttributeValue.fromS(UUID.randomUUID().toString),
-      parentPath -> AttributeValue.fromS("testParentPath"),
-      name -> AttributeValue.fromS("testName"),
-      typeField -> AttributeValue.fromS("ArchiveFolder"),
-      title -> AttributeValue.fromS("testTitle"),
-      description -> AttributeValue.fromS("testDescription"),
-      sortOrder -> AttributeValue.fromN("2"),
-      fileSize -> AttributeValue.fromN("1"),
-      checksumSha256 -> AttributeValue.fromS("testChecksumSha256"),
-      fileExtension -> AttributeValue.fromS("testFileExtension"),
-      "id_Test" -> AttributeValue.fromS("testIdentifier"),
-      "id_Test2" -> AttributeValue.fromS("testIdentifier2")
+      batchId -> fromS("testBatchId"),
+      id -> fromS(UUID.randomUUID().toString),
+      parentPath -> fromS("testParentPath"),
+      name -> fromS("testName"),
+      typeField -> fromS("ArchiveFolder"),
+      transferringBody -> fromS("testTransferringBody"),
+      transferCompleteDatetime -> fromS("2023-06-01T00:00Z"),
+      upstreamSystem -> fromS("testUpstreamSystem"),
+      digitalAssetSource -> fromS("testDigitalAssetSource"),
+      digitalAssetSubtype -> fromS("testDigitalAssetSubtype"),
+      originalFiles -> generateListAttributeValue("dec2b921-20e3-41e8-a299-f3cbc13131a2"),
+      originalMetadataFiles -> generateListAttributeValue("3f42e3f2-fffe-4fe9-87f7-262e95b86d75"),
+      title -> fromS("testTitle"),
+      description -> fromS("testDescription"),
+      sortOrder -> fromN("2"),
+      fileSize -> fromN("1"),
+      checksumSha256 -> fromS("testChecksumSha256"),
+      fileExtension -> fromS("testFileExtension"),
+      "id_Test" -> fromS("testIdentifier"),
+      "id_Test2" -> fromS("testIdentifier2")
     )
   }
 
@@ -36,24 +45,51 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     AttributeValue.builder().m(map.asJava).build()
 
   def allMandatoryFieldsMap(typeValue: String): Map[String, AttributeValue] = {
-    List((id, UUID.randomUUID().toString), (batchId, "batchId"), (name, "name"), (typeField, "ArchiveFolder"))
-      .map(field => field._1 -> AttributeValue.fromS(field._2))
-      .toMap +
-      (typeField -> AttributeValue.fromS(typeValue))
+    List(
+      (id, UUID.randomUUID().toString),
+      (batchId, "batchId"),
+      (name, "name"),
+      (typeField, "ArchiveFolder"),
+      (transferringBody, "testTransferringBody"),
+      (transferCompleteDatetime, "2023-06-01T00:00Z"),
+      (upstreamSystem, "testUpstreamSystem"),
+      (digitalAssetSource, "testDigitalAssetSource"),
+      (digitalAssetSubtype, "testDigitalAssetSubtype"),
+      (originalFiles, "dec2b921-20e3-41e8-a299-f3cbc13131a2"),
+      (originalMetadataFiles, "3f42e3f2-fffe-4fe9-87f7-262e95b86d75")
+    ).map { case (name, value) =>
+      if (name.endsWith("Files")) name -> generateListAttributeValue(value)
+      else name -> fromS(value)
+    }.toMap +
+      (typeField -> fromS(typeValue))
   }
 
   def invalidNumericField(fieldName: String): AttributeValue = buildAttributeValue(
-    allFieldsPopulated + (fieldName -> AttributeValue.fromS("1"))
+    allFieldsPopulated + (fieldName -> fromS("1"))
   )
   def invalidNumericValue(fieldName: String): AttributeValue = buildAttributeValue(
-    allFieldsPopulated + (fieldName -> AttributeValue.fromN("NaN"))
+    allFieldsPopulated + (fieldName -> fromN("NaN"))
+  )
+
+  def invalidListOfStringsValue(fieldName: String): AttributeValue = buildAttributeValue(
+    allFieldsPopulated + (
+      fieldName -> generateListAttributeValue("1", "dec2b921-20e3-41e8-a299-f3cbc13131a2")
+    )
+  )
+
+  def stringValueInListIsNotConvertable(fieldName: String): AttributeValue = buildAttributeValue(
+    allFieldsPopulated + (fieldName -> generateListAttributeValue("dec2b921-20e3-41e8-a299-f3cbc13131a2", "notAUuid"))
+  )
+
+  def stringValueIsNotConvertible(fieldName: String): AttributeValue = buildAttributeValue(
+    allFieldsPopulated + (fieldName -> fromS("notAConvertibleString"))
   )
 
   def invalidTypeAttributeValue: AttributeValue =
     AttributeValue.builder().m(allMandatoryFieldsMap("Invalid").asJava).build()
 
   def missingFieldsInvalidNumericField(invalidNumericField: String, missingFields: String*): AttributeValue =
-    buildAttributeValue(missingFieldsMap(missingFields: _*) + (invalidNumericField -> AttributeValue.fromS("1")))
+    buildAttributeValue(missingFieldsMap(missingFields: _*) + (invalidNumericField -> fromS("1")))
 
   def missingFieldsMap(fieldsToExclude: String*): Map[String, AttributeValue] = allMandatoryFieldsMap("ArchiveFolder")
     .filterNot(fields => fieldsToExclude.contains(fields._1))
@@ -70,6 +106,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     (missingFieldsAttributeValue(name), "'name': missing"),
     (missingFieldsAttributeValue(typeField), "'type': missing"),
     (missingFieldsAttributeValue(typeField, batchId, name), "'batchId': missing, 'name': missing, 'type': missing"),
+    (missingFieldsAttributeValue(transferCompleteDatetime), "'transferCompleteDatetime': missing"),
     (invalidNumericField(fileSize), "'fileSize': not of type: 'Number' was 'DynString(1)'"),
     (
       invalidNumericValue(fileSize),
@@ -85,16 +122,45 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       "'type': could not be converted to desired type: java.lang.Exception: Type Invalid not found"
     ),
     (
+      invalidListOfStringsValue(originalFiles),
+      "'originalFiles': missing"
+    ),
+    (
+      stringValueInListIsNotConvertable(originalMetadataFiles),
+      "'originalMetadataFiles': could not be converted to desired type: java.lang.RuntimeException: Cannot parse " +
+        "notAUuid for field originalMetadataFiles into class java.util.UUID"
+    ),
+    (
+      stringValueIsNotConvertible(transferCompleteDatetime),
+      "'transferCompleteDatetime': could not be converted to desired type: java.lang.RuntimeException: Cannot parse " +
+        "notAConvertibleString for field transferCompleteDatetime into class java.time.OffsetDateTime"
+    ),
+    (
       missingFieldsInvalidNumericField(fileSize, id, batchId),
       "'batchId': missing, 'id': missing, 'fileSize': not of type: 'Number' was 'DynString(1)'"
     )
   )
+
   forAll(invalidDynamoAttributeValues) { (attributeValue, expectedErrors) =>
     "dynamoTableFormat read" should s"return an error $expectedErrors" in {
       val res = dynamoTableFormat.read(attributeValue)
       res.isLeft should be(true)
       res.left.value.show should equal(expectedErrors)
     }
+  }
+
+  "allFieldsPopulated" should "contain all of the fields in DynamoTable" in {
+    val dynamoTableFields = generateDynamoTable().productElementNames.toList
+    val dynamoTableFieldsMapped = dynamoTableFields.map {
+      case "identifiers"    => "id_Test"
+      case "checksumSha256" => "checksum_sha256"
+      case theRest          => theRest
+    }
+
+    val dynamoFieldsNotAccountedFor =
+      dynamoTableFieldsMapped.filterNot(allFieldsPopulated.contains)
+
+    dynamoFieldsNotAccountedFor should equal(Nil)
   }
 
   "dynamoTableFormat read" should "return a valid object when all fields are populated" in {
@@ -105,6 +171,13 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     res.parentPath.get should equal("testParentPath")
     res.name should equal("testName")
     res.`type` should equal(ArchiveFolder)
+    res.transferringBody should equal("testTransferringBody")
+    res.transferCompleteDatetime should equal(OffsetDateTime.parse("2023-06-01T00:00Z"))
+    res.upstreamSystem should equal("testUpstreamSystem")
+    res.digitalAssetSource should equal("testDigitalAssetSource")
+    res.digitalAssetSubtype should equal("testDigitalAssetSubtype")
+    res.originalFiles should equal(List(UUID.fromString("dec2b921-20e3-41e8-a299-f3cbc13131a2")))
+    res.originalMetadataFiles should equal(List(UUID.fromString("3f42e3f2-fffe-4fe9-87f7-262e95b86d75")))
     res.title.get should equal("testTitle")
     res.description.get should equal("testDescription")
     res.sortOrder.get should equal(2)
@@ -116,40 +189,61 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
 
   "dynamoTableFormat write" should "write all mandatory fields and ignore any optional ones" in {
     val uuid = UUID.randomUUID()
-    val dynamoTable = DynamoTable(batchId, uuid, None, name, ContentFolder, None, None, None)
-    val res = dynamoTableFormat.write(dynamoTable)
-    val resultMap = res.toAttributeValue.m().asScala
-    resultMap(batchId).s() should equal(batchId)
-    resultMap(id).s() should equal(uuid.toString)
-    resultMap(name).s() should equal(name)
-    resultMap(typeField).s() should equal("ContentFolder")
-    List(parentPath, title, description, sortOrder, fileSize, checksumSha256, fileExtension, "identifiers")
-      .forall(resultMap.contains) should be(false)
-  }
-
-  "dynamoTableFormat write" should "write all fields when all fields are populated" in {
-    val uuid = UUID.randomUUID()
-    val identifiers = List(Identifier("Test1", "Value1"), Identifier("Test2", "Value2"))
+    val originalFilesUuid = UUID.randomUUID()
+    val originalMetadataFilesUuid = UUID.randomUUID()
     val dynamoTable = DynamoTable(
       batchId,
       uuid,
-      Option(parentPath),
+      None,
       name,
-      Asset,
-      Option(title),
-      Option(description),
-      Option(1),
-      Option(2),
-      Option(checksumSha256),
-      Option(fileExtension),
-      identifiers
+      ContentFolder,
+      transferringBody,
+      OffsetDateTime.parse("2023-06-01T00:00Z"),
+      upstreamSystem,
+      digitalAssetSource,
+      digitalAssetSubtype,
+      List(originalFilesUuid),
+      List(originalMetadataFilesUuid),
+      None,
+      None,
+      None
     )
     val res = dynamoTableFormat.write(dynamoTable)
     val resultMap = res.toAttributeValue.m().asScala
     resultMap(batchId).s() should equal(batchId)
     resultMap(id).s() should equal(uuid.toString)
     resultMap(name).s() should equal(name)
+    resultMap(typeField).s() should equal("ContentFolder")
+    resultMap(transferringBody).s() should equal(transferringBody)
+    resultMap(transferCompleteDatetime).s() should equal("2023-06-01T00:00Z")
+    resultMap(upstreamSystem).s() should equal(upstreamSystem)
+    resultMap(digitalAssetSource).s() should equal(digitalAssetSource)
+    resultMap(digitalAssetSubtype).s() should equal(digitalAssetSubtype)
+    resultMap(originalFiles).ss().asScala.toList should equal(List(originalFilesUuid.toString))
+    resultMap(originalMetadataFiles).ss().asScala.toList should equal(List(originalMetadataFilesUuid.toString))
+    List(parentPath, title, description, sortOrder, fileSize, checksumSha256, fileExtension, "identifiers")
+      .forall(resultMap.contains) should be(false)
+  }
+
+  "dynamoTableFormat write" should "write all fields when all fields are populated" in {
+    val uuid = UUID.randomUUID()
+    val originalFilesUuid = UUID.randomUUID()
+    val originalMetadataFilesUuid = UUID.randomUUID()
+    val dynamoTable = generateDynamoTable(uuid, originalFilesUuid, originalMetadataFilesUuid)
+
+    val res = dynamoTableFormat.write(dynamoTable)
+    val resultMap = res.toAttributeValue.m().asScala
+    resultMap(batchId).s() should equal(batchId)
+    resultMap(id).s() should equal(uuid.toString)
+    resultMap(name).s() should equal(name)
     resultMap(typeField).s() should equal("Asset")
+    resultMap(transferringBody).s() should equal(transferringBody)
+    resultMap(transferCompleteDatetime).s() should equal("2023-06-01T00:00Z")
+    resultMap(upstreamSystem).s() should equal(upstreamSystem)
+    resultMap(digitalAssetSource).s() should equal(digitalAssetSource)
+    resultMap(digitalAssetSubtype).s() should equal(digitalAssetSubtype)
+    resultMap(originalFiles).ss().asScala.toList should equal(List(originalFilesUuid.toString))
+    resultMap(originalMetadataFiles).ss().asScala.toList should equal(List(originalMetadataFilesUuid.toString))
     resultMap(parentPath).s() should equal(parentPath)
     resultMap(title).s() should equal(title)
     resultMap(description).s() should equal(description)
@@ -163,14 +257,14 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
 
   "pkFormat read" should "read the correct fields" in {
     val uuid = UUID.randomUUID()
-    val input = AttributeValue.fromM(Map(id -> AttributeValue.fromS(uuid.toString)).asJava)
+    val input = fromM(Map(id -> fromS(uuid.toString)).asJava)
     val res = pkFormat.read(input).value
     res.id should equal(uuid)
   }
 
   "pkFormat read" should "error if the field is missing" in {
     val uuid = UUID.randomUUID()
-    val input = AttributeValue.fromM(Map("invalid" -> AttributeValue.fromS(uuid.toString)).asJava)
+    val input = fromM(Map("invalid" -> fromS(uuid.toString)).asJava)
     val res = pkFormat.read(input)
     res.isLeft should be(true)
     val isMissingPropertyError = res.left.value.asInstanceOf[InvalidPropertiesError].errors.head._2 match {
@@ -184,5 +278,43 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     val uuid = UUID.randomUUID()
     val attributeValueMap = pkFormat.write(PartitionKey(uuid)).toAttributeValue.m().asScala
     UUID.fromString(attributeValueMap(id).s()) should equal(uuid)
+  }
+
+  private def generateListAttributeValue(values: String*): AttributeValue =
+    fromL(
+      values.toList
+        .map(value => if (value.forall(_.isDigit)) fromN(value) else fromS(value))
+        .asJava
+    )
+
+  private def generateDynamoTable(
+      uuid: UUID = UUID.randomUUID(),
+      originalFilesUuid: UUID = UUID.randomUUID(),
+      originalMetadataFilesUuid: UUID = UUID.randomUUID()
+  ) = {
+
+    val identifiers = List(Identifier("Test1", "Value1"), Identifier("Test2", "Value2"))
+
+    DynamoTable(
+      batchId,
+      uuid,
+      Option(parentPath),
+      name,
+      Asset,
+      transferringBody,
+      OffsetDateTime.parse("2023-06-01T00:00Z"),
+      upstreamSystem,
+      digitalAssetSource,
+      digitalAssetSubtype,
+      List(originalFilesUuid),
+      List(originalMetadataFilesUuid),
+      Option(title),
+      Option(description),
+      Option(1),
+      Option(2),
+      Option(checksumSha256),
+      Option(fileExtension),
+      identifiers
+    )
   }
 }
