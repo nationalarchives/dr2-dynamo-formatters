@@ -164,10 +164,10 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       case theRest          => theRest
     }
 
-    val allDynamoFieldsAccountedFor =
-      dynamoTableFieldsMapped.filterNot(dynamoTableField => allFieldsPopulated.contains(dynamoTableField))
+    val dynamoFieldsNotAccountedFor =
+      dynamoTableFieldsMapped.filterNot(allFieldsPopulated.contains)
 
-    allDynamoFieldsAccountedFor should equal(Nil)
+    dynamoFieldsNotAccountedFor should equal(Nil)
   }
 
   "dynamoTableFormat read" should "return a valid object when all fields are populated" in {
