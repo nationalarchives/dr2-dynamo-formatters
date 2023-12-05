@@ -28,10 +28,8 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       upstreamSystem -> fromS("testUpstreamSystem"),
       digitalAssetSource -> fromS("testDigitalAssetSource"),
       digitalAssetSubtype -> fromS("testDigitalAssetSubtype"),
-      originalFiles -> fromL(List(fromS("dec2b921-20e3-41e8-a299-f3cbc13131a2")).asJava),
-      originalMetadataFiles -> fromL(
-        List(fromS("3f42e3f2-fffe-4fe9-87f7-262e95b86d75")).asJava
-      ),
+      originalFiles -> generateListAttributeValue("dec2b921-20e3-41e8-a299-f3cbc13131a2"),
+      originalMetadataFiles -> generateListAttributeValue("3f42e3f2-fffe-4fe9-87f7-262e95b86d75"),
       title -> fromS("testTitle"),
       description -> fromS("testDescription"),
       sortOrder -> fromN("2"),
@@ -60,7 +58,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       (originalFiles, "dec2b921-20e3-41e8-a299-f3cbc13131a2"),
       (originalMetadataFiles, "3f42e3f2-fffe-4fe9-87f7-262e95b86d75")
     ).map { case (name, value) =>
-      if (name.endsWith("Files")) name -> fromL(List(fromS(value)).asJava)
+      if (name.endsWith("Files")) name -> generateListAttributeValue(value)
       else name -> fromS(value)
     }.toMap +
       (typeField -> fromS(typeValue))
@@ -75,16 +73,12 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
 
   def invalidListOfStringsValue(fieldName: String): AttributeValue = buildAttributeValue(
     allFieldsPopulated + (
-      fieldName -> fromL(List(fromS("aString"), fromN("1")).asJava)
+      fieldName -> generateListAttributeValue("1", "dec2b921-20e3-41e8-a299-f3cbc13131a2")
     )
   )
 
   def stringValueInListIsNotConvertable(fieldName: String): AttributeValue = buildAttributeValue(
-    allFieldsPopulated + (
-      fieldName -> fromL(
-        List(fromS("dec2b921-20e3-41e8-a299-f3cbc13131a2"), fromS("notAUuid")).asJava
-      )
-    )
+    allFieldsPopulated + (fieldName -> generateListAttributeValue("dec2b921-20e3-41e8-a299-f3cbc13131a2", "notAUuid"))
   )
 
   def stringValueIsNotConvertible(fieldName: String): AttributeValue = buildAttributeValue(
@@ -129,13 +123,12 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     ),
     (
       invalidListOfStringsValue(originalFiles),
-      "'originalFiles': could not be converted to desired type: java.lang.RuntimeException: Cannot parse " +
-        "List(AttributeValue(S=aString), AttributeValue(N=1)) for field originalFiles into Strings"
+      "'originalFiles': missing"
     ),
     (
       stringValueInListIsNotConvertable(originalMetadataFiles),
       "'originalMetadataFiles': could not be converted to desired type: java.lang.RuntimeException: Cannot parse " +
-        "List(AttributeValue(S=dec2b921-20e3-41e8-a299-f3cbc13131a2), AttributeValue(S=notAUuid)) for field originalMetadataFiles class java.util.UUID"
+        "notAUuid for field originalMetadataFiles into class java.util.UUID"
     ),
     (
       stringValueIsNotConvertible(transferCompleteDatetime),
@@ -286,6 +279,13 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     val attributeValueMap = pkFormat.write(PartitionKey(uuid)).toAttributeValue.m().asScala
     UUID.fromString(attributeValueMap(id).s()) should equal(uuid)
   }
+
+  private def generateListAttributeValue(values: String*): AttributeValue =
+    fromL(
+      values.toList
+        .map(value => if (value.forall(_.isDigit)) fromN(value) else fromS(value))
+        .asJava
+    )
 
   private def generateDynamoTable(
       uuid: UUID = UUID.randomUUID(),

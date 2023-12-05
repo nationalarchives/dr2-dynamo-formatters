@@ -10,8 +10,7 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue.Type._
 import java.time.OffsetDateTime
 import java.util.UUID
 import scala.jdk.CollectionConverters._
-import scala.reflect.ClassTag
-import scala.util.Try
+import scala.reflect.{ClassTag, classTag}
 
 object DynamoFormatters {
   private type InvalidProperty = (String, DynamoReadError)
@@ -33,8 +32,10 @@ object DynamoFormatters {
   val digitalAssetSubtype = "digitalAssetSubtype"
   val originalFiles = "originalFiles"
   val originalMetadataFiles = "originalMetadataFiles"
-  private val typeCoercionError =
-    (name: String, message: String) => (name -> TypeCoercionError(new RuntimeException(message))).invalidNel
+  private def typeCoercionError[T: ClassTag](name: String, value: String) =
+    name -> TypeCoercionError(
+      new RuntimeException(s"Cannot parse $value for field $name into ${classTag[T].runtimeClass}")
+    )
 
   private def stringToType(potentialTypeString: Option[String]): ValidatedNel[InvalidProperty, Type] =
     potentialTypeString match {
@@ -47,36 +48,28 @@ object DynamoFormatters {
       case None => (typeField -> MissingProperty).invalidNel
     }
 
-  private def stringToScalaType[T](name: String, potentialString: Option[String], toScalaTypeFunction: String => T)(
-      implicit classTag: ClassTag[T]
+  private def stringToScalaType[T: ClassTag](
+      name: String,
+      potentialString: Option[String],
+      toScalaTypeFunction: String => T
   ): ValidatedNel[InvalidProperty, T] =
     potentialString match {
       case Some(value) =>
-        val potentialDate = Try(toScalaTypeFunction(value))
-        if (potentialDate.isSuccess) potentialDate.get.validNel
-        else typeCoercionError(name, s"Cannot parse $value for field $name into ${classTag.runtimeClass}")
+        Validated
+          .catchOnly[Throwable](toScalaTypeFunction(value))
+          .leftMap(_ => typeCoercionError[T](name, value))
+          .toValidatedNel
 
       case None => (name -> MissingProperty).invalidNel
     }
 
-  private def convertListOfStringsToT[T](fromStringToAnotherType: String => T)(
+  private def convertListOfStringsToT[T: ClassTag](fromStringToAnotherType: String => T)(
       attributeName: String,
       attributes: List[AttributeValue]
-  )(implicit classTag: ClassTag[T]): ValidatedNel[(FieldName, TypeCoercionError), List[T]] = {
-    val potentiallyConvertedValues =
-      Try(attributes.map(_.s().toString)) // if result of .s() is 'null', convert to String and invoke NPE
-
-    if (potentiallyConvertedValues.isSuccess) {
-      val stringsPotentiallyConvertedToT =
-        potentiallyConvertedValues.get.map(stringValue =>
-          stringToScalaType(attributeName, Some(stringValue), fromStringToAnotherType)
-        )
-      val allStringsConvertedToT = stringsPotentiallyConvertedToT.forall(_.isValid)
-      if (allStringsConvertedToT) stringsPotentiallyConvertedToT.flatMap(validNelOfT => validNelOfT.toList).validNel
-      else
-        typeCoercionError(attributeName, s"Cannot parse $attributes for field $attributeName ${classTag.runtimeClass}")
-    } else typeCoercionError(attributeName, s"Cannot parse $attributes for field $attributeName into Strings")
-  }
+  ): ValidatedNel[(FieldName, DynamoReadError), List[T]] =
+    attributes
+      .map(stringValue => stringToScalaType(attributeName, Option(stringValue.s()), fromStringToAnotherType))
+      .sequence
 
   implicit val dynamoTableFormat: DynamoFormat[DynamoTable] = new DynamoFormat[DynamoTable] {
     override def read(dynamoValue: DynamoValue): Either[DynamoReadError, DynamoTable] = {
@@ -91,9 +84,10 @@ object DynamoFormatters {
             attributeValue.`type`() match {
               case N =>
                 val value = attributeValue.n()
-                val potentiallyConvertedValue = Try(toNumberFunction(value))
-                if (potentiallyConvertedValue.isSuccess) potentiallyConvertedValue.toOption.validNel
-                else typeCoercionError(name, s"Cannot parse $value for field $name into ${classTag.runtimeClass}")
+                Validated
+                  .catchOnly[Throwable](Option(toNumberFunction(value)))
+                  .leftMap(_ => typeCoercionError(name, value))
+                  .toValidatedNel
               case _ => (name -> NoPropertyOfType("Number", DynamoValue.fromAttributeValue(attributeValue))).invalidNel
             }
           }
@@ -112,7 +106,7 @@ object DynamoFormatters {
           convertListOfAttributesToT: (
               String,
               List[AttributeValue]
-          ) => ValidatedNel[(FieldName, TypeCoercionError), List[T]]
+          ) => ValidatedNel[(FieldName, DynamoReadError), List[T]]
       ): ValidatedNel[InvalidProperty, List[T]] =
         folderRowAsMap
           .get(name)
@@ -137,7 +131,7 @@ object DynamoFormatters {
         stringToScalaType(
           transferCompleteDatetime,
           getPotentialStringValue(transferCompleteDatetime),
-          str => OffsetDateTime.parse(str)
+          OffsetDateTime.parse
         ),
         getValidatedMandatoryFieldAsString(upstreamSystem),
         getValidatedMandatoryFieldAsString(digitalAssetSource),
