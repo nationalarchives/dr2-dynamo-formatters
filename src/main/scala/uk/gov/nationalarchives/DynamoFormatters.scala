@@ -1,19 +1,55 @@
 package uk.gov.nationalarchives
 
-import cats.data._
-import cats.implicits._
+import cats.data.ValidatedNel
 import org.scanamo._
-import org.scanamo.generic.semiauto._
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue.Type._
+import org.scanamo.generic.semiauto.{FieldName, Typeclass, deriveDynamoFormat}
+import uk.gov.nationalarchives.DynamoWriteUtils._
 
 import java.time.OffsetDateTime
 import java.util.UUID
 import scala.jdk.CollectionConverters._
-import scala.reflect.{ClassTag, classTag}
 
 object DynamoFormatters {
-  private type InvalidProperty = (String, DynamoReadError)
+
+  private def createReadDynamoUtils(dynamoValue: DynamoValue) = {
+    val folderRowAsMap = dynamoValue.toAttributeValue.m().asScala.toMap
+    new DynamoReadUtils(folderRowAsMap)
+  }
+
+  implicit val archiveFolderTableFormat: DynamoFormat[ArchiveFolderDynamoTable] =
+    new DynamoFormat[ArchiveFolderDynamoTable] {
+      override def read(dynamoValue: DynamoValue): Either[DynamoReadError, ArchiveFolderDynamoTable] =
+        createReadDynamoUtils(dynamoValue).readArchiveFolderRow
+
+      override def write(table: ArchiveFolderDynamoTable): DynamoValue =
+        writeArchiveFolderTable(table)
+    }
+
+  implicit val contentFolderTableFormat: DynamoFormat[ContentFolderDynamoTable] =
+    new DynamoFormat[ContentFolderDynamoTable] {
+      override def read(dynamoValue: DynamoValue): Either[DynamoReadError, ContentFolderDynamoTable] =
+        createReadDynamoUtils(dynamoValue).readContentFolderRow
+
+      override def write(table: ContentFolderDynamoTable): DynamoValue =
+        writeContentFolderTable(table)
+    }
+
+  implicit val assetTableFormat: DynamoFormat[AssetDynamoTable] = new DynamoFormat[AssetDynamoTable] {
+    override def read(dynamoValue: DynamoValue): Either[DynamoReadError, AssetDynamoTable] =
+      createReadDynamoUtils(dynamoValue).readAssetRow
+
+    override def write(table: AssetDynamoTable): DynamoValue =
+      writeAssetTable(table)
+  }
+
+  implicit val fileTableFormat: DynamoFormat[FileDynamoTable] = new DynamoFormat[FileDynamoTable] {
+    override def read(dynamoValue: DynamoValue): Either[DynamoReadError, FileDynamoTable] =
+      createReadDynamoUtils(dynamoValue).readFileRow
+
+    override def write(table: FileDynamoTable): DynamoValue =
+      writeFileTable(table)
+  }
+
   val batchId = "batchId"
   val id = "id"
   val name = "name"
@@ -32,187 +68,7 @@ object DynamoFormatters {
   val digitalAssetSubtype = "digitalAssetSubtype"
   val originalFiles = "originalFiles"
   val originalMetadataFiles = "originalMetadataFiles"
-  private def typeCoercionError[T: ClassTag](name: String, value: String) =
-    name -> TypeCoercionError(
-      new RuntimeException(s"Cannot parse $value for field $name into ${classTag[T].runtimeClass}")
-    )
 
-  private def stringToType(potentialTypeString: Option[String]): ValidatedNel[InvalidProperty, Type] =
-    potentialTypeString match {
-      case Some("ArchiveFolder") => ArchiveFolder.validNel
-      case Some("ContentFolder") => ContentFolder.validNel
-      case Some("Asset")         => Asset.validNel
-      case Some("File")          => File.validNel
-      case Some(otherTypeString) =>
-        (typeField -> TypeCoercionError(new Exception(s"Type $otherTypeString not found"))).invalidNel
-      case None => (typeField -> MissingProperty).invalidNel
-    }
-
-  private def stringToScalaType[T: ClassTag](
-      name: String,
-      potentialString: Option[String],
-      toScalaTypeFunction: String => T
-  ): ValidatedNel[InvalidProperty, T] =
-    potentialString match {
-      case Some(value) =>
-        Validated
-          .catchOnly[Throwable](toScalaTypeFunction(value))
-          .leftMap(_ => typeCoercionError[T](name, value))
-          .toValidatedNel
-
-      case None => (name -> MissingProperty).invalidNel
-    }
-
-  private def convertListOfStringsToT[T: ClassTag](fromStringToAnotherType: String => T)(
-      attributeName: String,
-      attributes: List[AttributeValue]
-  ): ValidatedNel[(FieldName, DynamoReadError), List[T]] =
-    attributes
-      .map(stringValue => stringToScalaType(attributeName, Option(stringValue.s()), fromStringToAnotherType))
-      .sequence
-
-  implicit val dynamoTableFormat: DynamoFormat[DynamoTable] = new DynamoFormat[DynamoTable] {
-    override def read(dynamoValue: DynamoValue): Either[DynamoReadError, DynamoTable] = {
-      val folderRowAsMap = dynamoValue.toAttributeValue.m().asScala.toMap
-
-      def getPotentialNumber[T](name: String, toNumberFunction: String => T)(implicit
-          classTag: ClassTag[T]
-      ): ValidatedNel[InvalidProperty, Option[T]] = {
-        folderRowAsMap
-          .get(name)
-          .map { attributeValue =>
-            attributeValue.`type`() match {
-              case N =>
-                val value = attributeValue.n()
-                Validated
-                  .catchOnly[Throwable](Option(toNumberFunction(value)))
-                  .leftMap(_ => typeCoercionError(name, value))
-                  .toValidatedNel
-              case _ => (name -> NoPropertyOfType("Number", DynamoValue.fromAttributeValue(attributeValue))).invalidNel
-            }
-          }
-          .getOrElse(None.validNel)
-      }
-
-      def getValidatedMandatoryFieldAsString(name: String): ValidatedNel[InvalidProperty, String] =
-        getPotentialStringValue(name)
-          .map(_.validNel)
-          .getOrElse((name -> MissingProperty).invalidNel)
-
-      def getPotentialStringValue(name: String) = folderRowAsMap.get(name).map(_.s())
-
-      def getPotentialListOfValues[T](
-          name: String,
-          convertListOfAttributesToT: (
-              String,
-              List[AttributeValue]
-          ) => ValidatedNel[(FieldName, DynamoReadError), List[T]]
-      ): ValidatedNel[InvalidProperty, List[T]] =
-        folderRowAsMap
-          .get(name)
-          .map { attributeValue =>
-            attributeValue.`type`() match {
-              case L =>
-                val attributes: List[AttributeValue] = attributeValue.l().asScala.toList
-                convertListOfAttributesToT(name, attributes)
-              case _ => (name -> NoPropertyOfType("List", DynamoValue.fromAttributeValue(attributeValue))).invalidNel
-            }
-          }
-          .getOrElse((name -> MissingProperty).invalidNel)
-
-      (
-        getValidatedMandatoryFieldAsString(batchId),
-        getValidatedMandatoryFieldAsString(id),
-        getValidatedMandatoryFieldAsString(name),
-        stringToType(getPotentialStringValue(typeField)),
-        getPotentialNumber(fileSize, _.toLong),
-        getPotentialNumber(sortOrder, _.toInt),
-        getValidatedMandatoryFieldAsString(transferringBody),
-        stringToScalaType(
-          transferCompleteDatetime,
-          getPotentialStringValue(transferCompleteDatetime),
-          OffsetDateTime.parse
-        ),
-        getValidatedMandatoryFieldAsString(upstreamSystem),
-        getValidatedMandatoryFieldAsString(digitalAssetSource),
-        getValidatedMandatoryFieldAsString(digitalAssetSubtype),
-        getPotentialListOfValues(originalFiles, convertListOfStringsToT(UUID.fromString)),
-        getPotentialListOfValues(originalMetadataFiles, convertListOfStringsToT(UUID.fromString))
-      ).mapN {
-        (
-            batchId,
-            id,
-            name,
-            typeName,
-            fileSize,
-            sortOrder,
-            transferringBody,
-            transferCompleteDatetime,
-            upstreamSystem,
-            digitalAssetSource,
-            digitalAssetSubtype,
-            originalFiles,
-            originalMetadataFiles
-        ) =>
-          val identifiers = folderRowAsMap.collect {
-            case (name, value) if name.startsWith("id_") => Identifier(name.drop(3), value.s())
-          }.toList
-
-          DynamoTable(
-            batchId,
-            UUID.fromString(id),
-            getPotentialStringValue(parentPath),
-            name,
-            typeName,
-            transferringBody,
-            transferCompleteDatetime,
-            upstreamSystem,
-            digitalAssetSource,
-            digitalAssetSubtype,
-            originalFiles,
-            originalMetadataFiles,
-            getPotentialStringValue(title),
-            getPotentialStringValue(description),
-            sortOrder,
-            fileSize,
-            getPotentialStringValue(checksumSha256),
-            getPotentialStringValue(fileExtension),
-            identifiers
-          )
-      }.toEither
-        .left
-        .map(InvalidPropertiesError.apply)
-    }
-
-    override def write(t: DynamoTable): DynamoValue = {
-      val potentialValues = Map(
-        batchId -> Option(DynamoValue.fromString(t.batchId)),
-        id -> Option(DynamoValue.fromString(t.id.toString)),
-        parentPath -> t.parentPath.map(DynamoValue.fromString),
-        name -> Option(DynamoValue.fromString(t.name)),
-        typeField -> Option(DynamoValue.fromString(t.`type`.toString)),
-        transferringBody -> Option(DynamoValue.fromString(t.transferringBody)),
-        transferCompleteDatetime -> Option(DynamoValue.fromString(t.transferCompleteDatetime.toString)),
-        upstreamSystem -> Option(DynamoValue.fromString(t.upstreamSystem)),
-        digitalAssetSource -> Option(DynamoValue.fromString(t.digitalAssetSource)),
-        digitalAssetSubtype -> Option(DynamoValue.fromString(t.digitalAssetSubtype)),
-        originalFiles -> Option(DynamoValue.fromStrings(t.originalFiles.map(_.toString))),
-        originalMetadataFiles -> Option(DynamoValue.fromStrings(t.originalMetadataFiles.map(_.toString))),
-        title -> t.title.map(DynamoValue.fromString),
-        description -> t.description.map(DynamoValue.fromString),
-        sortOrder -> t.sortOrder.map(DynamoValue.fromNumber[Int]),
-        fileSize -> t.fileSize.map(DynamoValue.fromNumber[Long]),
-        checksumSha256 -> t.checksumSha256.map(DynamoValue.fromString),
-        fileExtension -> t.fileExtension.map(DynamoValue.fromString)
-      ) ++ t.identifiers.map(id => s"id_${id.identifierName}" -> Option(DynamoValue.fromString(id.value))).toMap
-
-      val values = potentialValues.flatMap {
-        case (fieldName, Some(potentialValue)) => Map(fieldName -> potentialValue)
-        case _                                 => Map.empty
-      }
-      DynamoObject(values).toDynamoValue
-    }
-  }
   implicit val pkFormat: Typeclass[PartitionKey] = deriveDynamoFormat[PartitionKey]
 
   sealed trait Type {
@@ -224,12 +80,71 @@ object DynamoFormatters {
     }
   }
 
-  case class DynamoTable(
+  sealed trait DynamoTable {
+    def batchId: String
+    def id: UUID
+    def parentPath: Option[String]
+    def name: String
+    def `type`: Type
+    def title: Option[String]
+    def description: Option[String]
+    def identifiers: List[Identifier]
+  }
+
+  private type ValidatedField[T] = ValidatedNel[(FieldName, DynamoReadError), T]
+
+  case class ValidatedFields(
+      batchId: ValidatedField[String],
+      id: ValidatedField[UUID],
+      name: ValidatedField[String],
+      parentPath: Option[String],
+      title: Option[String],
+      description: Option[String],
+      `type`: ValidatedField[Type],
+      transferringBody: ValidatedField[String],
+      transferCompleteDatetime: ValidatedField[OffsetDateTime],
+      upstreamSystem: ValidatedField[String],
+      digitalAssetSource: ValidatedField[String],
+      digitalAssetSubtype: ValidatedField[String],
+      originalFiles: ValidatedField[List[UUID]],
+      originalMetadataFiles: ValidatedField[List[UUID]],
+      sortOrder: ValidatedField[Int],
+      fileSize: ValidatedField[Long],
+      checksumSha256: ValidatedField[String],
+      fileExtension: ValidatedField[String],
+      identifiers: List[Identifier]
+  )
+
+  case class ArchiveFolderDynamoTable(
       batchId: String,
       id: UUID,
       parentPath: Option[String],
       name: String,
       `type`: Type,
+      title: Option[String],
+      description: Option[String],
+      identifiers: List[Identifier]
+  ) extends DynamoTable
+
+  case class ContentFolderDynamoTable(
+      batchId: String,
+      id: UUID,
+      parentPath: Option[String],
+      name: String,
+      `type`: Type,
+      title: Option[String],
+      description: Option[String],
+      identifiers: List[Identifier]
+  ) extends DynamoTable
+
+  case class AssetDynamoTable(
+      batchId: String,
+      id: UUID,
+      parentPath: Option[String],
+      name: String,
+      `type`: Type,
+      title: Option[String],
+      description: Option[String],
       transferringBody: String,
       transferCompleteDatetime: OffsetDateTime,
       upstreamSystem: String,
@@ -237,14 +152,23 @@ object DynamoFormatters {
       digitalAssetSubtype: String,
       originalFiles: List[UUID],
       originalMetadataFiles: List[UUID],
-      title: Option[String] = None,
-      description: Option[String] = None,
-      sortOrder: Option[Int] = None,
-      fileSize: Option[Long] = None,
-      checksumSha256: Option[String] = None,
-      fileExtension: Option[String] = None,
-      identifiers: List[Identifier] = Nil
-  )
+      identifiers: List[Identifier]
+  ) extends DynamoTable
+
+  case class FileDynamoTable(
+      batchId: String,
+      id: UUID,
+      parentPath: Option[String],
+      name: String,
+      `type`: Type,
+      title: Option[String],
+      description: Option[String],
+      sortOrder: Int,
+      fileSize: Long,
+      checksumSha256: String,
+      fileExtension: String,
+      identifiers: List[Identifier]
+  ) extends DynamoTable
 
   case class Identifier(identifierName: String, value: String)
 
