@@ -218,7 +218,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
   )
 
   forAll(invalidDynamoAttributeValues) { (attributeValue, expectedErrors, rowType) =>
-    "dynamoTableFormat read" should s"return an error $expectedErrors" in {
+    "dynamoTableFormat read" should s"return an error $expectedErrors for row type $rowType" in {
       val dynamoTableFormat = rowType match {
         case DynamoFormatters.ArchiveFolder => archiveFolderTableFormat
         case DynamoFormatters.ContentFolder => contentFolderTableFormat
@@ -263,11 +263,9 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     }
   }
 
-  "dynamoTableFormat read" should "return a valid object when all asset fields are populated" in {
-    val res = assetTableFormat.read(buildAttributeValue(allAssetFieldsPopulated)).value
+  "assetTableFormat read" should "return a valid object when all asset fields are populated" in {
+    val assetRow = assetTableFormat.read(buildAttributeValue(allAssetFieldsPopulated)).value
 
-    res.isInstanceOf[AssetDynamoTable] should equal(true)
-    val assetRow = res.asInstanceOf[AssetDynamoTable]
     assetRow.batchId should equal("testBatchId")
     assetRow.id should equal(UUID.fromString(allAssetFieldsPopulated(id).s()))
     assetRow.parentPath.get should equal("testParentPath")
@@ -287,7 +285,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     )
   }
 
-  "dynamoTableFormat read" should "return a valid object when all file fields are populated" in {
+  "fileTableFormat read" should "return a valid object when all file fields are populated" in {
     val fileRow = fileTableFormat.read(buildAttributeValue(allFileFieldsPopulated)).value
 
     fileRow.batchId should equal("testBatchId")
@@ -303,7 +301,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     fileRow.fileExtension should equal("testFileExtension")
   }
 
-  "dynamoTableFormat read" should "return a valid object when all folder fields are populated" in {
+  "archiveFolderTableFormat read" should "return a valid object when all folder fields are populated" in {
     val folderRow = archiveFolderTableFormat.read(buildAttributeValue(allFolderFieldsPopulated)).value
 
     folderRow.batchId should equal("testBatchId")
@@ -315,7 +313,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     folderRow.description.get should equal("description")
   }
 
-  "dynamoTableFormat write" should "write all mandatory fields and ignore any optional ones" in {
+  "assetTableFormat write" should "write all mandatory fields and ignore any optional ones" in {
     val uuid = UUID.randomUUID()
     val originalFilesUuid = UUID.randomUUID()
     val originalMetadataFilesUuid = UUID.randomUUID()
