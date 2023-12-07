@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
 jobs:
   deploy:
-    uses: nationalarchives/tdr-github-actions/.github/workflows/sbt_release.yml@main
+    uses: nationalarchives/dr2-github-actions/.github/workflows/sbt_release.yml@main
     with:
       library-name: "DR2 Dynamo Formatters"
     secrets:
