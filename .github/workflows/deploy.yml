@@ -6,6 +6,7 @@ jobs:
     uses: nationalarchives/dr2-github-actions/.github/workflows/sbt_release.yml@main
     with:
       library-name: "DR2 Dynamo Formatters"
+      repo-name: dr2-dynamo-formatters
     secrets:
       WORKFLOW_PAT: ${{ secrets.WORKFLOW_TOKEN }}
       SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
