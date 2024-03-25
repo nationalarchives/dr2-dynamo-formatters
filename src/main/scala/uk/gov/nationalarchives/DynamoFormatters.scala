@@ -68,6 +68,8 @@ object DynamoFormatters {
   val digitalAssetSubtype = "digitalAssetSubtype"
   val originalFiles = "originalFiles"
   val originalMetadataFiles = "originalMetadataFiles"
+  val representationType = "representationType"
+  val representationSuffix = "representationSuffix"
 
   implicit val pkFormat: Typeclass[PartitionKey] = deriveDynamoFormat[PartitionKey]
 
@@ -112,6 +114,8 @@ object DynamoFormatters {
       fileSize: ValidatedField[Long],
       checksumSha256: ValidatedField[String],
       fileExtension: ValidatedField[String],
+      representationType: ValidatedField[RepresentationType],
+      representationSuffix: ValidatedField[String],
       identifiers: List[Identifier]
   )
 
@@ -167,6 +171,8 @@ object DynamoFormatters {
       fileSize: Long,
       checksumSha256: String,
       fileExtension: String,
+      representationType: RepresentationType,
+      representationSuffix: String,
       identifiers: List[Identifier]
   ) extends DynamoTable
 
@@ -181,5 +187,11 @@ object DynamoFormatters {
   case object Asset extends Type
 
   case object File extends Type
+
+  sealed trait RepresentationType
+
+  case object Preservation extends RepresentationType
+
+  case object Access extends RepresentationType
 
 }

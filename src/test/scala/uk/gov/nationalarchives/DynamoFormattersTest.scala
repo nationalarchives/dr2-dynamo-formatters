@@ -41,6 +41,8 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       fileSize -> fromN("1"),
       checksumSha256 -> fromS("testChecksumSha256"),
       fileExtension -> fromS("testFileExtension"),
+      representationType -> fromS("Preservation"),
+      representationSuffix -> fromS("1"),
       "id_Test" -> fromS("testIdentifier")
     )
   val allAssetFieldsPopulated: Map[String, AttributeValue] = {
@@ -67,7 +69,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
   def buildAttributeValue(map: Map[String, AttributeValue]): AttributeValue =
     AttributeValue.builder().m(map.asJava).build()
 
-  def allMandatoryFieldsMap(typeValue: String): Map[String, AttributeValue] = {
+  def allMandatoryFieldsMap(typeValue: String, representationTypeValue: String): Map[String, AttributeValue] = {
     val baseFields = List(
       (id, UUID.randomUUID().toString),
       (batchId, "batchId"),
@@ -92,13 +94,15 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
           (fileSize, "1"),
           (fileExtension, "testFileExtension"),
           (checksumSha256, "checksum"),
-          (sortOrder, "2")
+          (sortOrder, "2"),
+          (representationType, representationTypeValue),
+          (representationSuffix, "1")
         ) ++ baseFields
       case _ => Nil
     }
     fields.map { case (name, value) =>
       if (name.endsWith("Files")) name -> generateListAttributeValue(value)
-      else name -> fromS(value)
+      else name -> (if (value.forall(_.isDigit)) fromN(value) else fromS(value))
     }.toMap
   }
 
@@ -134,7 +138,10 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
   )
 
   def invalidTypeAttributeValue: AttributeValue =
-    AttributeValue.builder().m(allMandatoryFieldsMap("Invalid").asJava).build()
+    AttributeValue.builder().m(allMandatoryFieldsMap("Invalid", "Preservation").asJava).build()
+
+  def invalidRepresentationTypeAttributeValue: AttributeValue =
+    AttributeValue.builder().m(allMandatoryFieldsMap("File", "Invalid").asJava).build()
 
   def missingFieldsInvalidNumericField(
       rowType: Type,
@@ -144,7 +151,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     buildAttributeValue(missingFieldsMap(rowType, missingFields: _*) + (invalidNumericField -> fromS("1")))
 
   def missingFieldsMap(rowType: Type, fieldsToExclude: String*): Map[String, AttributeValue] =
-    allMandatoryFieldsMap(rowType.toString)
+    allMandatoryFieldsMap(rowType.toString, "Preservation")
       .filterNot(fields => fieldsToExclude.contains(fields._1))
 
   def missingFieldsAttributeValue(rowType: Type, fieldsToExclude: String*): AttributeValue = {
@@ -190,7 +197,12 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     ),
     (
       invalidTypeAttributeValue,
-      "'batchId': missing, 'id': missing, 'name': missing, 'sortOrder': missing, 'fileSize': missing, 'checksum_sha256': missing, 'fileExtension': missing, 'type': missing",
+      "'batchId': missing, 'id': missing, 'name': missing, 'sortOrder': missing, 'fileSize': missing, 'checksum_sha256': missing, 'fileExtension': missing, 'type': missing, 'representationType': missing, 'representationSuffix': missing",
+      File
+    ),
+    (
+      invalidRepresentationTypeAttributeValue,
+      "'representationType': could not be converted to desired type: java.lang.Exception: Representation type Invalid not found",
       File
     ),
     (
@@ -212,7 +224,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     ),
     (
       missingFieldsInvalidNumericField(File, fileSize, id, batchId),
-      "'batchId': missing, 'id': missing, 'sortOrder': not of type: 'Number' was 'DynString(2)', 'fileSize': not of type: 'Number' was 'DynString(1)'",
+      "'batchId': missing, 'id': missing, 'fileSize': not of type: 'Number' was 'DynString(1)'",
       File
     )
   )
@@ -422,6 +434,8 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       2,
       "checksum",
       "ext",
+      Preservation,
+      "1",
       Nil
     )
   }
