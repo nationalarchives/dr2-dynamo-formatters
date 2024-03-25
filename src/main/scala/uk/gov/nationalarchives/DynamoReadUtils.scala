@@ -23,8 +23,8 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
 
   private val allValidatedLockTableFields: LockTableValidatedFields = LockTableValidatedFields(
     stringToScalaType[UUID](
-      assetId,
-      getPotentialStringValue(assetId),
+      ioId,
+      getPotentialStringValue(ioId),
       UUID.fromString
     ),
     getValidatedMandatoryFieldAsString(batchId),

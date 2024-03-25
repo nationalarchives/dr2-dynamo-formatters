@@ -62,7 +62,7 @@ object DynamoWriteUtils {
   def writeLockTable(lockTable: IngestLockTable): DynamoValue =
     DynamoObject {
       Map(
-        assetId -> DynamoValue.fromString(lockTable.assetId.toString),
+        ioId -> DynamoValue.fromString(lockTable.ioId.toString),
         batchId -> DynamoValue.fromString(lockTable.batchId),
         message -> DynamoValue.fromString(lockTable.message)
       )

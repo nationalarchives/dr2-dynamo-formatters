@@ -58,7 +58,7 @@ object DynamoFormatters {
   }
 
   val batchId = "batchId"
-  val assetId = "assetId"
+  val ioId = "ioId"
   val id = "id"
   val message = "message"
   val name = "name"
@@ -197,6 +197,6 @@ object DynamoFormatters {
 
   case object File extends Type
 
-  case class IngestLockTable(assetId: UUID, batchId: String, message: String)
+  case class IngestLockTable(ioId: UUID, batchId: String, message: String)
 
 }
