@@ -382,7 +382,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     val message = "{}"
 
     val input =
-      fromM(Map("assetId" -> fromS(ioId.toString), "batchId" -> fromS(batchId), "message" -> fromS(message)).asJava)
+      fromM(Map("ioId" -> fromS(ioId.toString), "batchId" -> fromS(batchId), "message" -> fromS(message)).asJava)
     val res = ingestLockTableFormat.read(input).value
     res.ioId should equal(ioId)
     res.batchId should equal(batchId)
