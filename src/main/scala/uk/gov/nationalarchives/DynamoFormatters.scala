@@ -50,8 +50,17 @@ object DynamoFormatters {
       writeFileTable(table)
   }
 
+  implicit val ingestLockTableFormat: DynamoFormat[IngestLockTable] = new DynamoFormat[IngestLockTable] {
+    override def read(dynamoValue: DynamoValue): Either[DynamoReadError, IngestLockTable] =
+      createReadDynamoUtils(dynamoValue).readLockTableRow
+
+    override def write(ingestLockTable: IngestLockTable): DynamoValue = writeLockTable(ingestLockTable)
+  }
+
   val batchId = "batchId"
+  val assetId = "assetId"
   val id = "id"
+  val message = "message"
   val name = "name"
   val typeField = "type"
   val fileSize = "fileSize"
@@ -93,7 +102,13 @@ object DynamoFormatters {
 
   private type ValidatedField[T] = ValidatedNel[(FieldName, DynamoReadError), T]
 
-  case class ValidatedFields(
+  case class LockTableValidatedFields(
+      assetId: ValidatedField[UUID],
+      batchId: ValidatedField[String],
+      message: ValidatedField[String]
+  )
+
+  case class FilesTableValidatedFields(
       batchId: ValidatedField[String],
       id: ValidatedField[UUID],
       name: ValidatedField[String],
@@ -181,5 +196,7 @@ object DynamoFormatters {
   case object Asset extends Type
 
   case object File extends Type
+
+  case class IngestLockTable(assetId: UUID, batchId: String, message: String)
 
 }
