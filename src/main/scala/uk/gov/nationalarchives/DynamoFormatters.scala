@@ -191,7 +191,7 @@ object DynamoFormatters {
   sealed trait FileRepresentationType {
     override def toString: String = this match {
       case PreservationRepresentationType => "Preservation"
-      case AccessRepresentationType => "Access"
+      case AccessRepresentationType       => "Access"
     }
   }
 
