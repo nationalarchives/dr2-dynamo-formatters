@@ -190,8 +190,8 @@ object DynamoFormatters {
 
   sealed trait FileRepresentationType
 
-  case object RepresentationTypePreservation extends FileRepresentationType
+  case object PreservationRepresentationType extends FileRepresentationType
 
-  case object RepresentationTypeAccess extends FileRepresentationType
+  case object AccessRepresentationType extends FileRepresentationType
 
 }

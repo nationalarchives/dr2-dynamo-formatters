@@ -68,8 +68,8 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
       potentialRepresentationTypeString: Option[String]
   ): ValidatedNel[InvalidProperty, FileRepresentationType] =
     potentialRepresentationTypeString match {
-      case Some("Preservation") => RepresentationTypePreservation.validNel
-      case Some("Access")       => RepresentationTypeAccess.validNel
+      case Some("Preservation") => PreservationRepresentationType.validNel
+      case Some("Access")       => AccessRepresentationType.validNel
       case Some(otherRepresentationTypeString) =>
         (representationType -> TypeCoercionError(
           new Exception(s"Representation type $otherRepresentationTypeString not found")

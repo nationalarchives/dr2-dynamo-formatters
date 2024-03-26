@@ -461,7 +461,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       2,
       "checksum",
       "ext",
-      RepresentationTypePreservation,
+      PreservationRepresentationType,
       1,
       List(Identifier("FileIdentifier1", "FileIdentifier1Value"))
     )
