@@ -49,7 +49,7 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
     getValidatedMandatoryFieldAsString(checksumSha256),
     getValidatedMandatoryFieldAsString(fileExtension),
     stringToRepresentationType(getPotentialStringValue(representationType)),
-    getValidatedMandatoryFieldAsString(representationSuffix),
+    getNumber(representationSuffix, _.toInt),
     identifiers
   )
 
@@ -66,10 +66,10 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
 
   private def stringToRepresentationType(
       potentialRepresentationTypeString: Option[String]
-  ): ValidatedNel[InvalidProperty, RepresentationType] =
+  ): ValidatedNel[InvalidProperty, FileRepresentationType] =
     potentialRepresentationTypeString match {
-      case Some("Preservation") => Preservation.validNel
-      case Some("Access")       => Access.validNel
+      case Some("Preservation") => RepresentationTypePreservation.validNel
+      case Some("Access")       => RepresentationTypeAccess.validNel
       case Some(otherRepresentationTypeString) =>
         (representationType -> TypeCoercionError(
           new Exception(s"Representation type $otherRepresentationTypeString not found")

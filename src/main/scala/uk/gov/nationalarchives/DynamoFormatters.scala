@@ -114,8 +114,8 @@ object DynamoFormatters {
       fileSize: ValidatedField[Long],
       checksumSha256: ValidatedField[String],
       fileExtension: ValidatedField[String],
-      representationType: ValidatedField[RepresentationType],
-      representationSuffix: ValidatedField[String],
+      representationType: ValidatedField[FileRepresentationType],
+      representationSuffix: ValidatedField[Int],
       identifiers: List[Identifier]
   )
 
@@ -171,8 +171,8 @@ object DynamoFormatters {
       fileSize: Long,
       checksumSha256: String,
       fileExtension: String,
-      representationType: RepresentationType,
-      representationSuffix: String,
+      representationType: FileRepresentationType,
+      representationSuffix: Int,
       identifiers: List[Identifier]
   ) extends DynamoTable
 
@@ -188,10 +188,10 @@ object DynamoFormatters {
 
   case object File extends Type
 
-  sealed trait RepresentationType
+  sealed trait FileRepresentationType
 
-  case object Preservation extends RepresentationType
+  case object RepresentationTypePreservation extends FileRepresentationType
 
-  case object Access extends RepresentationType
+  case object RepresentationTypeAccess extends FileRepresentationType
 
 }

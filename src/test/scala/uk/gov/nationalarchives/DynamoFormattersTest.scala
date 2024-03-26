@@ -42,7 +42,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       checksumSha256 -> fromS("testChecksumSha256"),
       fileExtension -> fromS("testFileExtension"),
       representationType -> fromS("Preservation"),
-      representationSuffix -> fromS("1"),
+      representationSuffix -> fromN("1"),
       "id_Test" -> fromS("testIdentifier")
     )
   val allAssetFieldsPopulated: Map[String, AttributeValue] = {
@@ -181,6 +181,11 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       File
     ),
     (
+      invalidNumericField(representationSuffix, File),
+      "'representationSuffix': not of type: 'Number' was 'DynString(1)'",
+      File
+    ),
+    (
       invalidNumericValue(fileSize, File),
       "'fileSize': could not be converted to desired type: java.lang.RuntimeException: Cannot parse NaN for field fileSize into long",
       File
@@ -313,6 +318,28 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     fileRow.fileExtension should equal("testFileExtension")
   }
 
+  "fileTableFormat write" should "write all mandatory fields and ignore any optional ones" in {
+    val uuid = UUID.randomUUID()
+    val dynamoTable = generateFileDynamoTable(uuid)
+    val res = fileTableFormat.write(dynamoTable)
+    val resultMap = res.toAttributeValue.m().asScala
+    resultMap(batchId).s() should equal(batchId)
+    resultMap(id).s() should equal(uuid.toString)
+    resultMap(name).s() should equal(name)
+    resultMap(typeField).s() should equal("File")
+    resultMap(parentPath).s() should equal("parentPath")
+    resultMap(title).s() should equal("title")
+    resultMap(description).s() should equal("description")
+    resultMap(sortOrder).n() should equal("1")
+    resultMap(fileSize).n() should equal("2")
+    resultMap(checksumSha256).s() should equal("checksum")
+    resultMap(fileExtension).s() should equal("ext")
+    resultMap("representationType").s() should equal("Preservation")
+    resultMap("representationSuffix").n() should equal("1")
+    resultMap("id_FileIdentifier1").s() should equal("FileIdentifier1Value")
+
+  }
+
   "archiveFolderTableFormat read" should "return a valid object when all folder fields are populated" in {
     val folderRow = archiveFolderTableFormat.read(buildAttributeValue(allFolderFieldsPopulated)).value
 
@@ -427,16 +454,16 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       uuid,
       Option(parentPath),
       name,
-      Asset,
+      File,
       Option(title),
       Option(description),
       1,
       2,
       "checksum",
       "ext",
-      Preservation,
-      "1",
-      Nil
+      RepresentationTypePreservation,
+      1,
+      List(Identifier("FileIdentifier1", "FileIdentifier1Value"))
     )
   }
 
