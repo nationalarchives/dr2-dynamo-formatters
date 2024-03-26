@@ -188,7 +188,12 @@ object DynamoFormatters {
 
   case object File extends Type
 
-  sealed trait FileRepresentationType
+  sealed trait FileRepresentationType {
+    override def toString: String = this match {
+      case PreservationRepresentationType => "Preservation"
+      case AccessRepresentationType => "Access"
+    }
+  }
 
   case object PreservationRepresentationType extends FileRepresentationType
 
