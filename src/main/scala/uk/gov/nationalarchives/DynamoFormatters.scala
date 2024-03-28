@@ -77,6 +77,8 @@ object DynamoFormatters {
   val digitalAssetSubtype = "digitalAssetSubtype"
   val originalFiles = "originalFiles"
   val originalMetadataFiles = "originalMetadataFiles"
+  val representationType = "representationType"
+  val representationSuffix = "representationSuffix"
 
   implicit val pkFormat: Typeclass[PartitionKey] = deriveDynamoFormat[PartitionKey]
 
@@ -103,10 +105,10 @@ object DynamoFormatters {
   private type ValidatedField[T] = ValidatedNel[(FieldName, DynamoReadError), T]
 
   case class LockTableValidatedFields(
-      assetId: ValidatedField[UUID],
-      batchId: ValidatedField[String],
-      message: ValidatedField[String]
-  )
+                                       assetId: ValidatedField[UUID],
+                                       batchId: ValidatedField[String],
+                                       message: ValidatedField[String]
+                                     )
 
   case class FilesTableValidatedFields(
       batchId: ValidatedField[String],
@@ -127,6 +129,8 @@ object DynamoFormatters {
       fileSize: ValidatedField[Long],
       checksumSha256: ValidatedField[String],
       fileExtension: ValidatedField[String],
+      representationType: ValidatedField[FileRepresentationType],
+      representationSuffix: ValidatedField[Int],
       identifiers: List[Identifier]
   )
 
@@ -182,6 +186,8 @@ object DynamoFormatters {
       fileSize: Long,
       checksumSha256: String,
       fileExtension: String,
+      representationType: FileRepresentationType,
+      representationSuffix: Int,
       identifiers: List[Identifier]
   ) extends DynamoTable
 
@@ -198,5 +204,16 @@ object DynamoFormatters {
   case object File extends Type
 
   case class IngestLockTable(ioId: UUID, batchId: String, message: String)
+
+  sealed trait FileRepresentationType {
+    override def toString: String = this match {
+      case PreservationRepresentationType => "Preservation"
+      case AccessRepresentationType       => "Access"
+    }
+  }
+
+  case object PreservationRepresentationType extends FileRepresentationType
+
+  case object AccessRepresentationType extends FileRepresentationType
 
 }

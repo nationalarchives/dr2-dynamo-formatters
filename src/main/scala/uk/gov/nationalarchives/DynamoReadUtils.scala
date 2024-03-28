@@ -58,6 +58,8 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
     getNumber(fileSize, _.toLong),
     getValidatedMandatoryFieldAsString(checksumSha256),
     getValidatedMandatoryFieldAsString(fileExtension),
+    stringToRepresentationType(getPotentialStringValue(representationType)),
+    getNumber(representationSuffix, _.toInt),
     identifiers
   )
 
@@ -70,6 +72,19 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
       case Some(otherTypeString) =>
         (typeField -> TypeCoercionError(new Exception(s"Type $otherTypeString not found"))).invalidNel
       case None => (typeField -> MissingProperty).invalidNel
+    }
+
+  private def stringToRepresentationType(
+      potentialRepresentationTypeString: Option[String]
+  ): ValidatedNel[InvalidProperty, FileRepresentationType] =
+    potentialRepresentationTypeString match {
+      case Some("Preservation") => PreservationRepresentationType.validNel
+      case Some("Access")       => AccessRepresentationType.validNel
+      case Some(otherRepresentationTypeString) =>
+        (representationType -> TypeCoercionError(
+          new Exception(s"Representation type $otherRepresentationTypeString not found")
+        )).invalidNel
+      case None => (representationType -> MissingProperty).invalidNel
     }
 
   private def typeCoercionError[T: ClassTag](name: String, value: String): (FieldName, TypeCoercionError) =
@@ -94,7 +109,7 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
       .getOrElse((name -> MissingProperty).invalidNel)
   }
 
-  def getValidatedMandatoryFieldAsString(name: String): ValidatedNel[InvalidProperty, String] = {
+  private def getValidatedMandatoryFieldAsString(name: String): ValidatedNel[InvalidProperty, String] = {
     getPotentialStringValue(name)
       .map(_.validNel)
       .getOrElse((name -> MissingProperty).invalidNel)
@@ -150,8 +165,8 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
       allValidatedLockTableFields.batchId,
       allValidatedLockTableFields.message
     ).mapN { (assetId, batchId, message) =>
-      IngestLockTable(assetId, batchId, message)
-    }.toEither
+        IngestLockTable(assetId, batchId, message)
+      }.toEither
       .left
       .map(InvalidPropertiesError.apply)
 
@@ -254,22 +269,38 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
       allValidatedFileTableFields.fileSize,
       allValidatedFileTableFields.checksumSha256,
       allValidatedFileTableFields.fileExtension,
-      allValidatedFileTableFields.`type`
-    ).mapN { (batchId, id, name, sortOrder, fileSize, checksumSha256, fileExtension, rowType) =>
-      FileDynamoTable(
-        batchId,
-        id,
-        allValidatedFileTableFields.parentPath,
-        name,
-        rowType,
-        allValidatedFileTableFields.title,
-        allValidatedFileTableFields.description,
-        sortOrder,
-        fileSize,
-        checksumSha256,
-        fileExtension,
-        allValidatedFileTableFields.identifiers
-      )
+      allValidatedFileTableFields.`type`,
+      allValidatedFileTableFields.representationType,
+      allValidatedFileTableFields.representationSuffix
+    ).mapN {
+      (
+          batchId,
+          id,
+          name,
+          sortOrder,
+          fileSize,
+          checksumSha256,
+          fileExtension,
+          rowType,
+          representationType,
+          representationSuffix
+      ) =>
+        FileDynamoTable(
+          batchId,
+          id,
+          allValidatedFileTableFields.parentPath,
+          name,
+          rowType,
+          allValidatedFileTableFields.title,
+          allValidatedFileTableFields.description,
+          sortOrder,
+          fileSize,
+          checksumSha256,
+          fileExtension,
+          representationType,
+          representationSuffix,
+          allValidatedFileTableFields.identifiers
+        )
     }.toEither
       .left
       .map(InvalidPropertiesError.apply)
