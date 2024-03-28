@@ -60,4 +60,13 @@ object DynamoWriteUtils {
           representationSuffix -> DynamoValue.fromNumber(fileDynamoTable.representationSuffix)
         )
     }.toDynamoValue
+
+  def writeLockTable(lockTable: IngestLockTable): DynamoValue =
+    DynamoObject {
+      Map(
+        ioId -> DynamoValue.fromString(lockTable.ioId.toString),
+        batchId -> DynamoValue.fromString(lockTable.batchId),
+        message -> DynamoValue.fromString(lockTable.message)
+      )
+    }.toDynamoValue
 }

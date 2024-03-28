@@ -415,6 +415,44 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     UUID.fromString(attributeValueMap(id).s()) should equal(uuid)
   }
 
+  "lockTable read" should "read the correct fields" in {
+    val ioId = UUID.randomUUID()
+    val batchId = "batchId"
+    val message = "{}"
+
+    val input =
+      fromM(Map("ioId" -> fromS(ioId.toString), "batchId" -> fromS(batchId), "message" -> fromS(message)).asJava)
+    val res = ingestLockTableFormat.read(input).value
+    res.ioId should equal(ioId)
+    res.batchId should equal(batchId)
+    res.message should equal(res.message)
+  }
+
+  "lockTable read" should "error if the field is missing" in {
+    val ioId = UUID.randomUUID()
+
+    val input = fromM(Map("invalidField" -> fromS(ioId.toString)).asJava)
+    val res = ingestLockTableFormat.read(input)
+    res.isLeft should be(true)
+    val isMissingPropertyError = res.left.value.asInstanceOf[InvalidPropertiesError].errors.head._2 match {
+      case MissingProperty => true
+      case _               => false
+    }
+    isMissingPropertyError should be(true)
+  }
+
+  "lockTable write" should "write the correct fields" in {
+    val ioId = UUID.randomUUID()
+    val batchId = "batchId"
+    val message = "{}"
+
+    val attributeValueMap =
+      ingestLockTableFormat.write(IngestLockTable(ioId, batchId, message)).toAttributeValue.m().asScala
+    UUID.fromString(attributeValueMap("ioId").s()) should equal(ioId)
+    attributeValueMap("batchId").s() should equal("batchId")
+    attributeValueMap("message").s() should equal("{}")
+  }
+
   private def generateListAttributeValue(values: String*): AttributeValue =
     fromL(
       values.toList
