@@ -56,10 +56,7 @@ object DynamoWriteUtils {
           fileSize -> DynamoValue.fromNumber[Long](fileDynamoTable.fileSize),
           checksumSha256 -> DynamoValue.fromString(fileDynamoTable.checksumSha256),
           fileExtension -> DynamoValue.fromString(fileDynamoTable.fileExtension),
-          representationType -> DynamoValue.fromString(fileDynamoTable.representationType match {
-            case DynamoFormatters.PreservationRepresentationType => "Preservation"
-            case DynamoFormatters.AccessRepresentationType       => "Access"
-          }),
+          representationType -> DynamoValue.fromString(fileDynamoTable.representationType.toString),
           representationSuffix -> DynamoValue.fromNumber(fileDynamoTable.representationSuffix)
         )
     }.toDynamoValue
