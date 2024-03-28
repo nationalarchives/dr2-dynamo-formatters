@@ -41,6 +41,8 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       fileSize -> fromN("1"),
       checksumSha256 -> fromS("testChecksumSha256"),
       fileExtension -> fromS("testFileExtension"),
+      representationType -> fromS("Preservation"),
+      representationSuffix -> fromN("1"),
       "id_Test" -> fromS("testIdentifier")
     )
   val allAssetFieldsPopulated: Map[String, AttributeValue] = {
@@ -67,7 +69,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
   def buildAttributeValue(map: Map[String, AttributeValue]): AttributeValue =
     AttributeValue.builder().m(map.asJava).build()
 
-  def allMandatoryFieldsMap(typeValue: String): Map[String, AttributeValue] = {
+  def allMandatoryFieldsMap(typeValue: String, representationTypeValue: String): Map[String, AttributeValue] = {
     val baseFields = List(
       (id, UUID.randomUUID().toString),
       (batchId, "batchId"),
@@ -92,13 +94,15 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
           (fileSize, "1"),
           (fileExtension, "testFileExtension"),
           (checksumSha256, "checksum"),
-          (sortOrder, "2")
+          (sortOrder, "2"),
+          (representationType, representationTypeValue),
+          (representationSuffix, "1")
         ) ++ baseFields
       case _ => Nil
     }
     fields.map { case (name, value) =>
       if (name.endsWith("Files")) name -> generateListAttributeValue(value)
-      else name -> fromS(value)
+      else name -> (if (value.forall(_.isDigit)) fromN(value) else fromS(value))
     }.toMap
   }
 
@@ -134,7 +138,10 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
   )
 
   def invalidTypeAttributeValue: AttributeValue =
-    AttributeValue.builder().m(allMandatoryFieldsMap("Invalid").asJava).build()
+    AttributeValue.builder().m(allMandatoryFieldsMap("Invalid", "Preservation").asJava).build()
+
+  def invalidRepresentationTypeAttributeValue: AttributeValue =
+    AttributeValue.builder().m(allMandatoryFieldsMap("File", "Invalid").asJava).build()
 
   def missingFieldsInvalidNumericField(
       rowType: Type,
@@ -144,7 +151,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     buildAttributeValue(missingFieldsMap(rowType, missingFields: _*) + (invalidNumericField -> fromS("1")))
 
   def missingFieldsMap(rowType: Type, fieldsToExclude: String*): Map[String, AttributeValue] =
-    allMandatoryFieldsMap(rowType.toString)
+    allMandatoryFieldsMap(rowType.toString, "Preservation")
       .filterNot(fields => fieldsToExclude.contains(fields._1))
 
   def missingFieldsAttributeValue(rowType: Type, fieldsToExclude: String*): AttributeValue = {
@@ -174,6 +181,11 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       File
     ),
     (
+      invalidNumericField(representationSuffix, File),
+      "'representationSuffix': not of type: 'Number' was 'DynString(1)'",
+      File
+    ),
+    (
       invalidNumericValue(fileSize, File),
       "'fileSize': could not be converted to desired type: java.lang.RuntimeException: Cannot parse NaN for field fileSize into long",
       File
@@ -190,7 +202,12 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     ),
     (
       invalidTypeAttributeValue,
-      "'batchId': missing, 'id': missing, 'name': missing, 'sortOrder': missing, 'fileSize': missing, 'checksum_sha256': missing, 'fileExtension': missing, 'type': missing",
+      "'batchId': missing, 'id': missing, 'name': missing, 'sortOrder': missing, 'fileSize': missing, 'checksum_sha256': missing, 'fileExtension': missing, 'type': missing, 'representationType': missing, 'representationSuffix': missing",
+      File
+    ),
+    (
+      invalidRepresentationTypeAttributeValue,
+      "'representationType': could not be converted to desired type: java.lang.Exception: Representation type Invalid not found",
       File
     ),
     (
@@ -212,7 +229,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     ),
     (
       missingFieldsInvalidNumericField(File, fileSize, id, batchId),
-      "'batchId': missing, 'id': missing, 'sortOrder': not of type: 'Number' was 'DynString(2)', 'fileSize': not of type: 'Number' was 'DynString(1)'",
+      "'batchId': missing, 'id': missing, 'fileSize': not of type: 'Number' was 'DynString(1)'",
       File
     )
   )
@@ -299,6 +316,28 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     fileRow.sortOrder should equal(2)
     fileRow.checksumSha256 should equal("testChecksumSha256")
     fileRow.fileExtension should equal("testFileExtension")
+  }
+
+  "fileTableFormat write" should "write all mandatory fields and ignore any optional ones" in {
+    val uuid = UUID.randomUUID()
+    val dynamoTable = generateFileDynamoTable(uuid)
+    val res = fileTableFormat.write(dynamoTable)
+    val resultMap = res.toAttributeValue.m().asScala
+    resultMap(batchId).s() should equal(batchId)
+    resultMap(id).s() should equal(uuid.toString)
+    resultMap(name).s() should equal(name)
+    resultMap(typeField).s() should equal("File")
+    resultMap(parentPath).s() should equal("parentPath")
+    resultMap(title).s() should equal("title")
+    resultMap(description).s() should equal("description")
+    resultMap(sortOrder).n() should equal("1")
+    resultMap(fileSize).n() should equal("2")
+    resultMap(checksumSha256).s() should equal("checksum")
+    resultMap(fileExtension).s() should equal("ext")
+    resultMap("representationType").s() should equal("Preservation")
+    resultMap("representationSuffix").n() should equal("1")
+    resultMap("id_FileIdentifier1").s() should equal("FileIdentifier1Value")
+
   }
 
   "archiveFolderTableFormat read" should "return a valid object when all folder fields are populated" in {
@@ -415,14 +454,16 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       uuid,
       Option(parentPath),
       name,
-      Asset,
+      File,
       Option(title),
       Option(description),
       1,
       2,
       "checksum",
       "ext",
-      Nil
+      PreservationRepresentationType,
+      1,
+      List(Identifier("FileIdentifier1", "FileIdentifier1Value"))
     )
   }
 

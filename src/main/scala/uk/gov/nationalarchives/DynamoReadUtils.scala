@@ -48,6 +48,8 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
     getNumber(fileSize, _.toLong),
     getValidatedMandatoryFieldAsString(checksumSha256),
     getValidatedMandatoryFieldAsString(fileExtension),
+    stringToRepresentationType(getPotentialStringValue(representationType)),
+    getNumber(representationSuffix, _.toInt),
     identifiers
   )
 
@@ -60,6 +62,19 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
       case Some(otherTypeString) =>
         (typeField -> TypeCoercionError(new Exception(s"Type $otherTypeString not found"))).invalidNel
       case None => (typeField -> MissingProperty).invalidNel
+    }
+
+  private def stringToRepresentationType(
+      potentialRepresentationTypeString: Option[String]
+  ): ValidatedNel[InvalidProperty, FileRepresentationType] =
+    potentialRepresentationTypeString match {
+      case Some("Preservation") => PreservationRepresentationType.validNel
+      case Some("Access")       => AccessRepresentationType.validNel
+      case Some(otherRepresentationTypeString) =>
+        (representationType -> TypeCoercionError(
+          new Exception(s"Representation type $otherRepresentationTypeString not found")
+        )).invalidNel
+      case None => (representationType -> MissingProperty).invalidNel
     }
 
   private def typeCoercionError[T: ClassTag](name: String, value: String): (FieldName, TypeCoercionError) =
@@ -233,22 +248,38 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
       allValidatedFields.fileSize,
       allValidatedFields.checksumSha256,
       allValidatedFields.fileExtension,
-      allValidatedFields.`type`
-    ).mapN { (batchId, id, name, sortOrder, fileSize, checksumSha256, fileExtension, rowType) =>
-      FileDynamoTable(
-        batchId,
-        id,
-        allValidatedFields.parentPath,
-        name,
-        rowType,
-        allValidatedFields.title,
-        allValidatedFields.description,
-        sortOrder,
-        fileSize,
-        checksumSha256,
-        fileExtension,
-        allValidatedFields.identifiers
-      )
+      allValidatedFields.`type`,
+      allValidatedFields.representationType,
+      allValidatedFields.representationSuffix
+    ).mapN {
+      (
+          batchId,
+          id,
+          name,
+          sortOrder,
+          fileSize,
+          checksumSha256,
+          fileExtension,
+          rowType,
+          representationType,
+          representationSuffix
+      ) =>
+        FileDynamoTable(
+          batchId,
+          id,
+          allValidatedFields.parentPath,
+          name,
+          rowType,
+          allValidatedFields.title,
+          allValidatedFields.description,
+          sortOrder,
+          fileSize,
+          checksumSha256,
+          fileExtension,
+          representationType,
+          representationSuffix,
+          allValidatedFields.identifiers
+        )
     }.toEither
       .left
       .map(InvalidPropertiesError.apply)

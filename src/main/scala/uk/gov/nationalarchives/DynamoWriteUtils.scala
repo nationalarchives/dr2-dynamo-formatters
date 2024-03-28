@@ -52,10 +52,12 @@ object DynamoWriteUtils {
     DynamoObject {
       commonFieldsToMap(fileDynamoTable) ++
         Map(
-          "sortOrder" -> DynamoValue.fromNumber[Int](sortOrder.toInt),
-          "fileSize" -> DynamoValue.fromNumber[Long](fileSize.toLong),
-          "checksumSha256" -> DynamoValue.fromString(checksumSha256),
-          "fileExtension" -> DynamoValue.fromString(fileExtension)
+          sortOrder -> DynamoValue.fromNumber[Int](fileDynamoTable.sortOrder),
+          fileSize -> DynamoValue.fromNumber[Long](fileDynamoTable.fileSize),
+          checksumSha256 -> DynamoValue.fromString(fileDynamoTable.checksumSha256),
+          fileExtension -> DynamoValue.fromString(fileDynamoTable.fileExtension),
+          representationType -> DynamoValue.fromString(fileDynamoTable.representationType.toString),
+          representationSuffix -> DynamoValue.fromNumber(fileDynamoTable.representationSuffix)
         )
     }.toDynamoValue
 }
