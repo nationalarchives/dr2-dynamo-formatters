@@ -105,10 +105,10 @@ object DynamoFormatters {
   private type ValidatedField[T] = ValidatedNel[(FieldName, DynamoReadError), T]
 
   case class LockTableValidatedFields(
-                                       assetId: ValidatedField[UUID],
-                                       batchId: ValidatedField[String],
-                                       message: ValidatedField[String]
-                                     )
+      assetId: ValidatedField[UUID],
+      batchId: ValidatedField[String],
+      message: ValidatedField[String]
+  )
 
   case class FilesTableValidatedFields(
       batchId: ValidatedField[String],

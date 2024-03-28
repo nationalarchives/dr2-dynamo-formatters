@@ -165,8 +165,8 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
       allValidatedLockTableFields.batchId,
       allValidatedLockTableFields.message
     ).mapN { (assetId, batchId, message) =>
-        IngestLockTable(assetId, batchId, message)
-      }.toEither
+      IngestLockTable(assetId, batchId, message)
+    }.toEither
       .left
       .map(InvalidPropertiesError.apply)
 
