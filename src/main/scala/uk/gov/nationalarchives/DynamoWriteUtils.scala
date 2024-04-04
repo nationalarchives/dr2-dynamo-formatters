@@ -2,7 +2,7 @@ package uk.gov.nationalarchives
 
 import org.scanamo.{DynamoObject, DynamoValue}
 import org.scanamo.generic.semiauto.FieldName
-import uk.gov.nationalarchives.DynamoFormatters._
+import uk.gov.nationalarchives.DynamoFormatters.*
 
 object DynamoWriteUtils {
 

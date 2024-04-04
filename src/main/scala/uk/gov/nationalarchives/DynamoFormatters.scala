@@ -1,13 +1,13 @@
 package uk.gov.nationalarchives
 
 import cats.data.ValidatedNel
-import org.scanamo._
+import org.scanamo.*
 import org.scanamo.generic.semiauto.{FieldName, Typeclass, deriveDynamoFormat}
-import uk.gov.nationalarchives.DynamoWriteUtils._
+import uk.gov.nationalarchives.DynamoWriteUtils.*
 
 import java.time.OffsetDateTime
 import java.util.UUID
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 object DynamoFormatters {
 
@@ -16,7 +16,7 @@ object DynamoFormatters {
     new DynamoReadUtils(folderRowAsMap)
   }
 
-  implicit val archiveFolderTableFormat: DynamoFormat[ArchiveFolderDynamoTable] =
+  given archiveFolderTableFormat: DynamoFormat[ArchiveFolderDynamoTable] =
     new DynamoFormat[ArchiveFolderDynamoTable] {
       override def read(dynamoValue: DynamoValue): Either[DynamoReadError, ArchiveFolderDynamoTable] =
         createReadDynamoUtils(dynamoValue).readArchiveFolderRow
@@ -25,7 +25,7 @@ object DynamoFormatters {
         writeArchiveFolderTable(table)
     }
 
-  implicit val contentFolderTableFormat: DynamoFormat[ContentFolderDynamoTable] =
+  given contentFolderTableFormat: DynamoFormat[ContentFolderDynamoTable] =
     new DynamoFormat[ContentFolderDynamoTable] {
       override def read(dynamoValue: DynamoValue): Either[DynamoReadError, ContentFolderDynamoTable] =
         createReadDynamoUtils(dynamoValue).readContentFolderRow
@@ -34,7 +34,7 @@ object DynamoFormatters {
         writeContentFolderTable(table)
     }
 
-  implicit val assetTableFormat: DynamoFormat[AssetDynamoTable] = new DynamoFormat[AssetDynamoTable] {
+  given assetTableFormat: DynamoFormat[AssetDynamoTable] = new DynamoFormat[AssetDynamoTable] {
     override def read(dynamoValue: DynamoValue): Either[DynamoReadError, AssetDynamoTable] =
       createReadDynamoUtils(dynamoValue).readAssetRow
 
@@ -42,7 +42,7 @@ object DynamoFormatters {
       writeAssetTable(table)
   }
 
-  implicit val fileTableFormat: DynamoFormat[FileDynamoTable] = new DynamoFormat[FileDynamoTable] {
+  given fileTableFormat: DynamoFormat[FileDynamoTable] = new DynamoFormat[FileDynamoTable] {
     override def read(dynamoValue: DynamoValue): Either[DynamoReadError, FileDynamoTable] =
       createReadDynamoUtils(dynamoValue).readFileRow
 
@@ -50,7 +50,7 @@ object DynamoFormatters {
       writeFileTable(table)
   }
 
-  implicit val ingestLockTableFormat: DynamoFormat[IngestLockTable] = new DynamoFormat[IngestLockTable] {
+  given ingestLockTableFormat: DynamoFormat[IngestLockTable] = new DynamoFormat[IngestLockTable] {
     override def read(dynamoValue: DynamoValue): Either[DynamoReadError, IngestLockTable] =
       createReadDynamoUtils(dynamoValue).readLockTableRow
 
@@ -80,16 +80,10 @@ object DynamoFormatters {
   val representationType = "representationType"
   val representationSuffix = "representationSuffix"
 
-  implicit val pkFormat: Typeclass[PartitionKey] = deriveDynamoFormat[PartitionKey]
+  given pkFormat: Typeclass[PartitionKey] = deriveDynamoFormat[PartitionKey]
 
-  sealed trait Type {
-    override def toString: String = this match {
-      case ArchiveFolder => "ArchiveFolder"
-      case ContentFolder => "ContentFolder"
-      case Asset         => "Asset"
-      case File          => "File"
-    }
-  }
+  enum Type:
+    case ArchiveFolder, ContentFolder, Asset, File
 
   sealed trait DynamoTable {
     def batchId: String
@@ -195,25 +189,13 @@ object DynamoFormatters {
 
   case class PartitionKey(id: UUID)
 
-  case object ArchiveFolder extends Type
-
-  case object ContentFolder extends Type
-
-  case object Asset extends Type
-
-  case object File extends Type
-
   case class IngestLockTable(ioId: UUID, batchId: String, message: String)
 
-  sealed trait FileRepresentationType {
-    override def toString: String = this match {
+  enum FileRepresentationType:
+    override def toString: String = this match
       case PreservationRepresentationType => "Preservation"
       case AccessRepresentationType       => "Access"
-    }
-  }
 
-  case object PreservationRepresentationType extends FileRepresentationType
-
-  case object AccessRepresentationType extends FileRepresentationType
+    case PreservationRepresentationType, AccessRepresentationType
 
 }
