@@ -260,13 +260,13 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
 
   forAll(typeTable) { rowType =>
     s"all${rowType}FieldsPopulated" should "contain all of the fields in DynamoTable" in {
-      val generatedTableElementNames = rowType match {
+      val tableElementNames = rowType match {
         case ArchiveFolder => generateFolderDynamoTable().productElementNames
         case ContentFolder => generateFolderDynamoTable().productElementNames
         case Asset         => generateAssetDynamoTable().productElementNames
         case File          => generateFileDynamoTable().productElementNames
       }
-      val dynamoTableFields = generatedTableElementNames.toList
+      val dynamoTableFields = tableElementNames.toList
       val dynamoTableFieldsMapped = dynamoTableFields.map {
         case "identifiers"    => "id_Test"
         case "checksumSha256" => "checksum_sha256"
