@@ -1,18 +1,20 @@
 package uk.gov.nationalarchives
 
-import cats.implicits._
+import cats.implicits.*
 import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers._
+import org.scalatest.matchers.should.Matchers.*
 import org.scalatest.prop.{TableDrivenPropertyChecks, TableFor1, TableFor3}
-import org.scanamo._
+import org.scanamo.*
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue.{fromL, fromM, fromN, fromS}
-import uk.gov.nationalarchives.DynamoFormatters._
+import uk.gov.nationalarchives.DynamoFormatters.{given, *}
+import uk.gov.nationalarchives.DynamoFormatters.Type.*
+import uk.gov.nationalarchives.DynamoFormatters.FileRepresentationType.*
 
 import java.time.OffsetDateTime
 import java.util.UUID
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks with EitherValues {
 
@@ -236,12 +238,12 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
 
   forAll(invalidDynamoAttributeValues) { (attributeValue, expectedErrors, rowType) =>
     "dynamoTableFormat read" should s"return an error $expectedErrors for row type $rowType" in {
-      val dynamoTableFormat = rowType match {
-        case DynamoFormatters.ArchiveFolder => archiveFolderTableFormat
-        case DynamoFormatters.ContentFolder => contentFolderTableFormat
-        case DynamoFormatters.Asset         => assetTableFormat
-        case DynamoFormatters.File          => fileTableFormat
-      }
+      val dynamoTableFormat = rowType match
+        case ArchiveFolder => archiveFolderTableFormat
+        case ContentFolder => contentFolderTableFormat
+        case Asset         => assetTableFormat
+        case File          => fileTableFormat
+
       val res = dynamoTableFormat.read(attributeValue)
       res.isLeft should be(true)
       res.left.value.show should equal(expectedErrors)
@@ -258,13 +260,13 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
 
   forAll(typeTable) { rowType =>
     s"all${rowType}FieldsPopulated" should "contain all of the fields in DynamoTable" in {
-      val generatedTable = rowType match {
-        case ArchiveFolder => generateFolderDynamoTable()
-        case ContentFolder => generateFolderDynamoTable()
-        case Asset         => generateAssetDynamoTable()
-        case File          => generateFileDynamoTable()
+      val tableElementNames = rowType match {
+        case ArchiveFolder => generateFolderDynamoTable().productElementNames
+        case ContentFolder => generateFolderDynamoTable().productElementNames
+        case Asset         => generateAssetDynamoTable().productElementNames
+        case File          => generateFileDynamoTable().productElementNames
       }
-      val dynamoTableFields = generatedTable.productElementNames.toList
+      val dynamoTableFields = tableElementNames.toList
       val dynamoTableFieldsMapped = dynamoTableFields.map {
         case "identifiers"    => "id_Test"
         case "checksumSha256" => "checksum_sha256"

@@ -1,7 +1,7 @@
 import sbtrelease.ReleaseStateTransformations._
 import Dependencies._
 
-lazy val scala2Version = "2.13.12"
+lazy val scala3Version = "3.3.3"
 
 lazy val releaseSettings = Seq(
   useGpgPinentry := true,
@@ -46,7 +46,7 @@ lazy val releaseSettings = Seq(
 )
 
 lazy val commonSettings = Seq(
-  scalaVersion := scala2Version,
+  scalaVersion := scala3Version,
   libraryDependencies ++= Seq(
     scanamo,
     scalaTest % Test

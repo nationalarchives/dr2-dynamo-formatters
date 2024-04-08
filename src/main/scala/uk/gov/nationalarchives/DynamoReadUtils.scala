@@ -1,17 +1,19 @@
 package uk.gov.nationalarchives
 
-import cats.data._
-import cats.implicits._
-import org.scanamo._
-import org.scanamo.generic.semiauto._
+import cats.data.*
+import cats.implicits.*
+import org.scanamo.*
+import org.scanamo.generic.semiauto.*
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue.Type._
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue.Type.*
 
 import java.time.OffsetDateTime
 import java.util.UUID
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.reflect.{ClassTag, classTag}
-import DynamoFormatters._
+import DynamoFormatters.Type.*
+import DynamoFormatters.FileRepresentationType.*
+import DynamoFormatters.*
 
 class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
 
