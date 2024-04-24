@@ -29,10 +29,9 @@ Their identifierName will be prefixed with id_ and used as the field name
 The formatter will report all errors with a particular Dynamo row.
 
 ## Lock table
-This holds a lock with an information object ID, a batch id and the message to be processed.
+This holds a lock with an asset ID, a message ID, the parentMessage ID and the execution ID.
 ### Validation
 #### Mandatory fields
 These fields must always be present
-* ioId (UUID)
-* batchId (String)
-* message (String)
+* assetId (UUID)
+* messageId (UUID)
