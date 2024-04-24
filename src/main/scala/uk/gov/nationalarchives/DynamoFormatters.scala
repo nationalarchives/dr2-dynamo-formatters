@@ -77,6 +77,7 @@ object DynamoFormatters {
   val originalMetadataFiles = "originalMetadataFiles"
   val representationType = "representationType"
   val representationSuffix = "representationSuffix"
+  val ingestedPreservica = "ingested_PS"
 
   val assetId = "assetId"
   val messageId = "messageId"
@@ -129,6 +130,7 @@ object DynamoFormatters {
       fileExtension: ValidatedField[String],
       representationType: ValidatedField[FileRepresentationType],
       representationSuffix: ValidatedField[Int],
+      ingestedPreservica: Option[String],
       identifiers: List[Identifier]
   )
 
@@ -169,6 +171,7 @@ object DynamoFormatters {
       digitalAssetSubtype: String,
       originalFiles: List[UUID],
       originalMetadataFiles: List[UUID],
+      ingestedPreservica: Boolean,
       identifiers: List[Identifier]
   ) extends DynamoTable
 
@@ -186,6 +189,7 @@ object DynamoFormatters {
       fileExtension: String,
       representationType: FileRepresentationType,
       representationSuffix: Int,
+      ingestedPreservica: Boolean,
       identifiers: List[Identifier]
   ) extends DynamoTable
 

@@ -71,6 +71,7 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
     getValidatedMandatoryFieldAsString(fileExtension),
     stringToRepresentationType(getPotentialStringValue(representationType)),
     getNumber(representationSuffix, _.toInt),
+    getPotentialStringValue(ingestedPreservica),
     identifiers
   )
 
@@ -275,6 +276,7 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
           digitalAssetSubtype,
           originalFiles,
           originalMetadataFiles,
+          allValidatedFileTableFields.ingestedPreservica.contains("true"),
           allValidatedFileTableFields.identifiers
         )
     }.toEither
@@ -320,6 +322,7 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
           fileExtension,
           representationType,
           representationSuffix,
+          allValidatedFileTableFields.ingestedPreservica.contains("true"),
           allValidatedFileTableFields.identifiers
         )
     }.toEither

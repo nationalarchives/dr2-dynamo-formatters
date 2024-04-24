@@ -45,6 +45,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       checksumSha256 -> fromS("testChecksumSha256"),
       fileExtension -> fromS("testFileExtension"),
       representationType -> fromS("Preservation"),
+      ingestedPreservica -> fromS("true"),
       representationSuffix -> fromN("1"),
       "id_Test" -> fromS("testIdentifier")
     )
@@ -63,6 +64,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       originalFiles -> generateListAttributeValue("dec2b921-20e3-41e8-a299-f3cbc13131a2"),
       originalMetadataFiles -> generateListAttributeValue("3f42e3f2-fffe-4fe9-87f7-262e95b86d75"),
       title -> fromS("testTitle"),
+      ingestedPreservica -> fromS("true"),
       description -> fromS("testDescription"),
       "id_Test" -> fromS("testIdentifier"),
       "id_Test2" -> fromS("testIdentifier2")
@@ -269,9 +271,10 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       }
       val dynamoTableFields = tableElementNames.toList
       val dynamoTableFieldsMapped = dynamoTableFields.map {
-        case "identifiers"    => "id_Test"
-        case "checksumSha256" => "checksum_sha256"
-        case theRest          => theRest
+        case "identifiers"        => "id_Test"
+        case "checksumSha256"     => "checksum_sha256"
+        case "ingestedPreservica" => "ingested_PS"
+        case theRest              => theRest
       }
 
       val fieldsPopulated = populatedFields(rowType)
@@ -281,6 +284,19 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
 
       dynamoFieldsNotAccountedFor should equal(Nil)
     }
+  }
+
+  "assetTableFormat read" should "return true for ingested_PS if the value is true and false otherwise" in {
+    val assetRowIngested = assetTableFormat.read(buildAttributeValue(allAssetFieldsPopulated)).value
+    assetRowIngested.ingestedPreservica should equal(true)
+
+    val assetRowNotIngested =
+      assetTableFormat.read(buildAttributeValue(allAssetFieldsPopulated + (ingestedPreservica -> fromS("false")))).value
+    assetRowNotIngested.ingestedPreservica should equal(false)
+
+    val assetRowInvalidValue =
+      assetTableFormat.read(buildAttributeValue(allAssetFieldsPopulated + (ingestedPreservica -> fromS("1")))).value
+    assetRowInvalidValue.ingestedPreservica should equal(false)
   }
 
   "assetTableFormat read" should "return a valid object when all asset fields are populated" in {
@@ -303,6 +319,19 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     assetRow.identifiers.sortBy(_.identifierName) should equal(
       List(Identifier("Test2", "testIdentifier2"), Identifier("Test", "testIdentifier")).sortBy(_.identifierName)
     )
+  }
+
+  "fileTableFormat read" should "return true for ingested_PS if the value is true and false otherwise" in {
+    val fileRowIngested = fileTableFormat.read(buildAttributeValue(allFileFieldsPopulated)).value
+    fileRowIngested.ingestedPreservica should equal(true)
+
+    val fileRowNotIngested =
+      fileTableFormat.read(buildAttributeValue(allFileFieldsPopulated + (ingestedPreservica -> fromS("false")))).value
+    fileRowNotIngested.ingestedPreservica should equal(false)
+
+    val fileRowInvalidValue =
+      fileTableFormat.read(buildAttributeValue(allFileFieldsPopulated + (ingestedPreservica -> fromS("1")))).value
+    fileRowInvalidValue.ingestedPreservica should equal(false)
   }
 
   "fileTableFormat read" should "return a valid object when all file fields are populated" in {
@@ -338,9 +367,9 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     resultMap(checksumSha256).s() should equal("checksum")
     resultMap(fileExtension).s() should equal("ext")
     resultMap("representationType").s() should equal("Preservation")
+    resultMap(ingestedPreservica).s() should equal("true")
     resultMap("representationSuffix").n() should equal("1")
     resultMap("id_FileIdentifier1").s() should equal("FileIdentifier1Value")
-
   }
 
   "archiveFolderTableFormat read" should "return a valid object when all folder fields are populated" in {
@@ -374,6 +403,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       digitalAssetSubtype,
       List(originalFilesUuid),
       List(originalMetadataFilesUuid),
+      true,
       Nil
     )
     val res = assetTableFormat.write(dynamoTable)
@@ -389,6 +419,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     resultMap(digitalAssetSubtype).s() should equal(digitalAssetSubtype)
     resultMap(originalFiles).ss().asScala.toList should equal(List(originalFilesUuid.toString))
     resultMap(originalMetadataFiles).ss().asScala.toList should equal(List(originalMetadataFilesUuid.toString))
+    resultMap(ingestedPreservica).s() should equal("true")
     List(parentPath, title, description, sortOrder, fileSize, checksumSha256, fileExtension, "identifiers")
       .forall(resultMap.contains) should be(false)
   }
@@ -526,7 +557,8 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
   private def generateAssetDynamoTable(
       uuid: UUID = UUID.randomUUID(),
       originalFilesUuid: UUID = UUID.randomUUID(),
-      originalMetadataFilesUuid: UUID = UUID.randomUUID()
+      originalMetadataFilesUuid: UUID = UUID.randomUUID(),
+      ingestedPreservica: Boolean = true
   ): AssetDynamoTable = {
 
     val identifiers = List(Identifier("Test1", "Value1"), Identifier("Test2", "Value2"))
@@ -545,11 +577,15 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       digitalAssetSubtype,
       List(originalFilesUuid),
       List(originalMetadataFilesUuid),
+      ingestedPreservica,
       identifiers
     )
   }
 
-  private def generateFileDynamoTable(uuid: UUID = UUID.randomUUID()): FileDynamoTable = {
+  private def generateFileDynamoTable(
+      uuid: UUID = UUID.randomUUID(),
+      ingestedPreservica: Boolean = true
+  ): FileDynamoTable = {
     FileDynamoTable(
       batchId,
       uuid,
@@ -564,6 +600,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       "ext",
       PreservationRepresentationType,
       1,
+      ingestedPreservica,
       List(Identifier("FileIdentifier1", "FileIdentifier1Value"))
     )
   }
