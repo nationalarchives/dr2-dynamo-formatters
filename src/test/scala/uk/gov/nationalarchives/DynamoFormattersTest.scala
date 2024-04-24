@@ -5,10 +5,11 @@ import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers.*
 import org.scalatest.prop.{TableDrivenPropertyChecks, TableFor1, TableFor3}
+import org.scanamo
 import org.scanamo.*
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue.{fromL, fromM, fromN, fromS}
-import uk.gov.nationalarchives.DynamoFormatters.{given, *}
+import uk.gov.nationalarchives.DynamoFormatters.{*, given}
 import uk.gov.nationalarchives.DynamoFormatters.Type.*
 import uk.gov.nationalarchives.DynamoFormatters.FileRepresentationType.*
 
@@ -418,42 +419,102 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
   }
 
   "lockTable read" should "read the correct fields" in {
-    val ioId = UUID.randomUUID()
-    val batchId = "batchId"
-    val message = "{}"
+    val assetId = UUID.randomUUID()
+    val parentMessageId = UUID.randomUUID()
+    val messageId = UUID.randomUUID()
+    val executionId = UUID.randomUUID()
 
     val input =
-      fromM(Map("ioId" -> fromS(ioId.toString), "batchId" -> fromS(batchId), "message" -> fromS(message)).asJava)
+      fromM(
+        Map(
+          "assetId" -> fromS(assetId.toString),
+          "parentMessageId" -> fromS(parentMessageId.toString),
+          "messageId" -> fromS(messageId.toString),
+          "executionId" -> fromS(executionId.toString)
+        ).asJava
+      )
     val res = ingestLockTableFormat.read(input).value
-    res.ioId should equal(ioId)
-    res.batchId should equal(batchId)
-    res.message should equal(res.message)
+    res.assetId should equal(assetId)
+    res.parentMessageId should equal(Some(parentMessageId))
+    res.messageId should equal(messageId)
+    res.executionId should equal(Some(executionId))
   }
 
-  "lockTable read" should "error if the field is missing" in {
-    val ioId = UUID.randomUUID()
+  "lockTable read" should "return the error type 'MissingProperty' for each of the required fields, 'assetId' and 'messageId', " +
+    "if they are missing but not for the optional fields 'parentMessageId' and 'executionId'" in {
+      val input = fromM(Map("invalidField" -> fromS(UUID.randomUUID().toString)).asJava)
+      val res = ingestLockTableFormat.read(input)
+      val expectedMissingProperties = List(assetId, messageId)
 
-    val input = fromM(Map("invalidField" -> fromS(ioId.toString)).asJava)
-    val res = ingestLockTableFormat.read(input)
-    res.isLeft should be(true)
-    val isMissingPropertyError = res.left.value.asInstanceOf[InvalidPropertiesError].errors.head._2 match {
-      case MissingProperty => true
-      case _               => false
+      val actualMissingProperties = res.left.value.asInstanceOf[InvalidPropertiesError].errors
+
+      val expectedPropertiesAreMissing = actualMissingProperties.forall {
+        case (name: String, a: MissingProperty.type) => expectedMissingProperties.contains(name)
+        case _                                       => false
+      }
+      res.isLeft should be(true)
+      actualMissingProperties.length should equal(2)
+      expectedPropertiesAreMissing should be(true)
+
+      val actualMissingPropertyNames = actualMissingProperties.map { case (name, _) => name }.toList
+      List("parentMessageId", "executionId").foreach { optionalProperty =>
+        actualMissingPropertyNames.contains(optionalProperty) should equal(false)
+      }
     }
-    isMissingPropertyError should be(true)
-  }
+
+  "lockTable read" should "return the values of 'None' for the optional properties 'parentMessageId' and 'executionId' " +
+    "if they are missing" in {
+      val assetId = UUID.randomUUID()
+      val parentMessageId = UUID.randomUUID()
+      val messageId = UUID.randomUUID()
+      val executionId = UUID.randomUUID()
+
+      val input =
+        fromM(
+          Map(
+            "assetId" -> fromS(assetId.toString),
+            "messageId" -> fromS(messageId.toString)
+          ).asJava
+        )
+      val res = ingestLockTableFormat.read(input).value
+      res.assetId should equal(assetId)
+      res.parentMessageId should equal(None)
+      res.messageId should equal(messageId)
+      res.executionId should equal(None)
+    }
 
   "lockTable write" should "write the correct fields" in {
-    val ioId = UUID.randomUUID()
-    val batchId = "batchId"
-    val message = "{}"
+    val assetId = UUID.randomUUID()
+    val messageId = UUID.randomUUID()
+    val parentMessageId = UUID.randomUUID()
+    val executionId = UUID.randomUUID()
 
     val attributeValueMap =
-      ingestLockTableFormat.write(IngestLockTable(ioId, batchId, message)).toAttributeValue.m().asScala
-    UUID.fromString(attributeValueMap("ioId").s()) should equal(ioId)
-    attributeValueMap("batchId").s() should equal("batchId")
-    attributeValueMap("message").s() should equal("{}")
+      ingestLockTableFormat
+        .write(IngestLockTable(assetId, messageId, Some(parentMessageId), Some(executionId)))
+        .toAttributeValue
+        .m()
+        .asScala
+
+    attributeValueMap("assetId").s() should equal(assetId.toString)
+    attributeValueMap("messageId").s() should equal(messageId.toString)
+    attributeValueMap("parentMessageId").s() should equal(parentMessageId.toString)
+    attributeValueMap("executionId").s() should equal(executionId.toString)
   }
+
+  "lockTable write" should "write only the required fields, 'assetId' and 'messageId' if the value of 'None' was given " +
+    "for 'parentMessageId' and 'executionId'" in {
+      val assetId = UUID.randomUUID()
+      val messageId = UUID.randomUUID()
+
+      val attributeValueMap =
+        ingestLockTableFormat.write(IngestLockTable(assetId, messageId, None, None)).toAttributeValue.m().asScala
+
+      attributeValueMap("assetId").s() should equal(assetId.toString)
+      attributeValueMap("messageId").s() should equal(messageId.toString)
+      attributeValueMap.get("parentMessageId").map(_.s()) should equal(None)
+      attributeValueMap.get("executionId").map(_.s()) should equal(None)
+    }
 
   private def generateListAttributeValue(values: String*): AttributeValue =
     fromL(

@@ -58,9 +58,7 @@ object DynamoFormatters {
   }
 
   val batchId = "batchId"
-  val ioId = "ioId"
   val id = "id"
-  val message = "message"
   val name = "name"
   val typeField = "type"
   val fileSize = "fileSize"
@@ -79,6 +77,11 @@ object DynamoFormatters {
   val originalMetadataFiles = "originalMetadataFiles"
   val representationType = "representationType"
   val representationSuffix = "representationSuffix"
+
+  val assetId = "assetId"
+  val messageId = "messageId"
+  val parentMessageId = "parentMessageId"
+  val executionId = "executionId"
 
   given pkFormat: Typeclass[PartitionKey] = deriveDynamoFormat[PartitionKey]
 
@@ -99,9 +102,10 @@ object DynamoFormatters {
   private type ValidatedField[T] = ValidatedNel[(FieldName, DynamoReadError), T]
 
   case class LockTableValidatedFields(
-      assetId: ValidatedField[UUID],
-      batchId: ValidatedField[String],
-      message: ValidatedField[String]
+      assetId: ValidatedField[UUID], // We have not yet decided whether it's going to be Zref or UUID
+      messageId: ValidatedField[UUID],
+      parentMessageId: ValidatedField[Option[UUID]],
+      executionId: ValidatedField[Option[UUID]]
   )
 
   case class FilesTableValidatedFields(
@@ -189,7 +193,7 @@ object DynamoFormatters {
 
   case class PartitionKey(id: UUID)
 
-  case class IngestLockTable(ioId: UUID, batchId: String, message: String)
+  case class IngestLockTable(assetId: UUID, messageId: UUID, parentMessageId: Option[UUID], executionId: Option[UUID])
 
   enum FileRepresentationType:
     override def toString: String = this match

@@ -63,10 +63,16 @@ object DynamoWriteUtils {
 
   def writeLockTable(lockTable: IngestLockTable): DynamoValue =
     DynamoObject {
-      Map(
-        ioId -> DynamoValue.fromString(lockTable.ioId.toString),
-        batchId -> DynamoValue.fromString(lockTable.batchId),
-        message -> DynamoValue.fromString(lockTable.message)
+      val optionalFields: Map[FieldName, DynamoValue] = Map(
+        "executionId" -> lockTable.executionId.map(id => DynamoValue.fromString(id.toString)),
+        "parentMessageId" -> lockTable.parentMessageId.map(pid => DynamoValue.fromString(pid.toString))
+      ).flatMap {
+        case (fieldName, Some(value)) => Map(fieldName -> value)
+        case _                        => Map.empty
+      }
+      optionalFields ++ Map(
+        assetId -> DynamoValue.fromString(lockTable.assetId.toString),
+        messageId -> DynamoValue.fromString(lockTable.messageId.toString)
       )
     }.toDynamoValue
 }
