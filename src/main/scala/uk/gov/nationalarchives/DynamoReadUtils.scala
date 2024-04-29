@@ -25,21 +25,12 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
 
   private val allValidatedLockTableFields: LockTableValidatedFields = LockTableValidatedFields(
     stringToScalaType[UUID](
-      assetId,
-      getPotentialStringValue(assetId),
+      ioId,
+      getPotentialStringValue(ioId),
       UUID.fromString
     ),
-    stringToScalaType[UUID](
-      messageId,
-      getPotentialStringValue(messageId),
-      UUID.fromString
-    ),
-    optionalStringToOptionalScalaType[UUID](
-      parentMessageId,
-      getPotentialStringValue(parentMessageId),
-      UUID.fromString
-    ),
-    getPotentialStringValue(executionId)
+    getValidatedMandatoryFieldAsString(batchId),
+    getValidatedMandatoryFieldAsString(message)
   )
 
   private val allValidatedFileTableFields: FilesTableValidatedFields = FilesTableValidatedFields(
@@ -162,16 +153,6 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
       case None => (name -> MissingProperty).invalidNel
     }
 
-  private def optionalStringToOptionalScalaType[T: ClassTag](
-      name: String,
-      potentialString: Option[String],
-      toScalaTypeFunction: String => T
-  ): ValidatedNel[(FieldName, TypeCoercionError), Option[T]] =
-    Validated
-      .catchOnly[Throwable](potentialString.map(toScalaTypeFunction))
-      .leftMap(_ => typeCoercionError[T](name, potentialString.getOrElse("")))
-      .toValidatedNel
-
   private def convertListOfStringsToT[T: ClassTag](fromStringToAnotherType: String => T)(
       attributeName: String,
       attributes: List[AttributeValue]
@@ -183,10 +164,10 @@ class DynamoReadUtils(folderRowAsMap: Map[String, AttributeValue]) {
   def readLockTableRow: Either[InvalidPropertiesError, IngestLockTable] =
     (
       allValidatedLockTableFields.assetId,
-      allValidatedLockTableFields.messageId,
-      allValidatedLockTableFields.parentMessageId
-    ).mapN { (assetId, messageId, parentMessageId) =>
-      IngestLockTable(assetId, messageId, parentMessageId, allValidatedLockTableFields.executionId)
+      allValidatedLockTableFields.batchId,
+      allValidatedLockTableFields.message
+    ).mapN { (assetId, batchId, message) =>
+      IngestLockTable(assetId, batchId, message)
     }.toEither
       .left
       .map(InvalidPropertiesError.apply)
