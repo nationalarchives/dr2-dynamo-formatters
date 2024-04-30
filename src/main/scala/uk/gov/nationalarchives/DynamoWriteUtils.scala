@@ -44,7 +44,8 @@ object DynamoWriteUtils {
           "digitalAssetSource" -> DynamoValue.fromString(assetDynamoTable.digitalAssetSource),
           "digitalAssetSubtype" -> DynamoValue.fromString(assetDynamoTable.digitalAssetSubtype),
           "originalFiles" -> DynamoValue.fromStrings(assetDynamoTable.originalFiles.map(_.toString)),
-          "originalMetadataFiles" -> DynamoValue.fromStrings(assetDynamoTable.originalMetadataFiles.map(_.toString))
+          "originalMetadataFiles" -> DynamoValue.fromStrings(assetDynamoTable.originalMetadataFiles.map(_.toString)),
+          ingestedPreservica -> DynamoValue.fromString(assetDynamoTable.ingestedPreservica.toString)
         )
     }.toDynamoValue
 
@@ -57,7 +58,8 @@ object DynamoWriteUtils {
           checksumSha256 -> DynamoValue.fromString(fileDynamoTable.checksumSha256),
           fileExtension -> DynamoValue.fromString(fileDynamoTable.fileExtension),
           representationType -> DynamoValue.fromString(fileDynamoTable.representationType.toString),
-          representationSuffix -> DynamoValue.fromNumber(fileDynamoTable.representationSuffix)
+          representationSuffix -> DynamoValue.fromNumber(fileDynamoTable.representationSuffix),
+          ingestedPreservica -> DynamoValue.fromString(fileDynamoTable.ingestedPreservica.toString)
         )
     }.toDynamoValue
 
