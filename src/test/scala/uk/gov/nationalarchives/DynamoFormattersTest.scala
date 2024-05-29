@@ -423,17 +423,17 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       .forall(resultMap.contains) should be(false)
   }
 
-  "pkFormat read" should "read the correct fields" in {
+  "filesTablePkFormat read" should "read the correct fields" in {
     val uuid = UUID.randomUUID()
     val input = fromM(Map(id -> fromS(uuid.toString)).asJava)
-    val res = pkFormat.read(input).value
+    val res = filesTablePkFormat.read(input).value
     res.id should equal(uuid)
   }
 
-  "pkFormat read" should "error if the field is missing" in {
+  "filesTablePkFormat read" should "error if the field is missing" in {
     val uuid = UUID.randomUUID()
     val input = fromM(Map("invalid" -> fromS(uuid.toString)).asJava)
-    val res = pkFormat.read(input)
+    val res = filesTablePkFormat.read(input)
     res.isLeft should be(true)
     val isMissingPropertyError = res.left.value.asInstanceOf[InvalidPropertiesError].errors.head._2 match {
       case MissingProperty => true
@@ -442,9 +442,9 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     isMissingPropertyError should be(true)
   }
 
-  "pkFormat write" should "write the correct fields" in {
+  "filesTablePkFormat write" should "write the correct fields" in {
     val uuid = UUID.randomUUID()
-    val attributeValueMap = pkFormat.write(PartitionKey(uuid)).toAttributeValue.m().asScala
+    val attributeValueMap = filesTablePkFormat.write(FilesTablePartitionKey(uuid)).toAttributeValue.m().asScala
     UUID.fromString(attributeValueMap(id).s()) should equal(uuid)
   }
 
@@ -484,6 +484,31 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     UUID.fromString(attributeValueMap("ioId").s()) should equal(ioId)
     attributeValueMap("batchId").s() should equal("batchId")
     attributeValueMap("message").s() should equal("{}")
+  }
+
+  "lockTablePkFormat read" should "read the correct fields" in {
+    val uuid = UUID.randomUUID()
+    val input = fromM(Map(ioId -> fromS(uuid.toString)).asJava)
+    val res = lockTablePkFormat.read(input).value
+    res.ioId should equal(uuid)
+  }
+
+  "lockTablePkFormat read" should "error if the field is missing" in {
+    val uuid = UUID.randomUUID()
+    val input = fromM(Map("invalid" -> fromS(uuid.toString)).asJava)
+    val res = lockTablePkFormat.read(input)
+    res.isLeft should be(true)
+    val isMissingPropertyError = res.left.value.asInstanceOf[InvalidPropertiesError].errors.head._2 match {
+      case MissingProperty => true
+      case _               => false
+    }
+    isMissingPropertyError should be(true)
+  }
+
+  "lockTablePkFormat write" should "write the correct fields" in {
+    val uuid = UUID.randomUUID()
+    val attributeValueMap = lockTablePkFormat.write(LockTablePartitionKey(uuid)).toAttributeValue.m().asScala
+    UUID.fromString(attributeValueMap(ioId).s()) should equal(uuid)
   }
 
   private def generateListAttributeValue(values: String*): AttributeValue =
