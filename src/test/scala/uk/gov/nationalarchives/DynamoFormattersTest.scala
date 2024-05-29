@@ -383,6 +383,21 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     folderRow.description.get should equal("description")
   }
 
+  "archiveFolderTableFormat write" should "write all mandatory fields and ignore any optional ones" in {
+    val uuid = UUID.randomUUID()
+    val dynamoTable = generateFolderDynamoTable(uuid)
+    val res = archiveFolderTableFormat.write(dynamoTable)
+    val resultMap = res.toAttributeValue.m().asScala
+
+    resultMap(batchId).s() should equal(batchId)
+    resultMap(id).s() should equal(uuid.toString)
+    resultMap(name).s() should equal(name)
+    resultMap(parentPath).s() should equal("parentPath")
+    resultMap(title).s() should equal("title")
+    resultMap(description).s() should equal("description")
+    resultMap(typeField).s() should equal("ArchiveFolder")
+  }
+
   "assetTableFormat write" should "write all mandatory fields and ignore any optional ones" in {
     val uuid = UUID.randomUUID()
     val originalFilesUuid = UUID.randomUUID()
@@ -421,6 +436,34 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     resultMap(ingestedPreservica).s() should equal("true")
     List(parentPath, title, description, sortOrder, fileSize, checksumSha256, fileExtension, "identifiers")
       .forall(resultMap.contains) should be(false)
+  }
+
+  "contentFolderTableFormat read" should "return a valid object when all folder fields are populated" in {
+    val folderRow = contentFolderTableFormat.read(buildAttributeValue(allFolderFieldsPopulated)).value
+
+    folderRow.batchId should equal("testBatchId")
+    folderRow.id should equal(UUID.fromString(allFolderFieldsPopulated(id).s()))
+    folderRow.parentPath.get should equal("testParentPath")
+    folderRow.name should equal("testName")
+    folderRow.`type` should equal(ArchiveFolder)
+    folderRow.title.get should equal("title")
+    folderRow.description.get should equal("description")
+    folderRow.identifiers should equal(List(Identifier("Test", "testIdentifier")))
+  }
+
+  "contentFolderTableFormat write" should "write all mandatory fields and ignore any optional ones" in {
+    val uuid = UUID.randomUUID()
+    val dynamoTable = generateContentFolderDynamoTable(uuid)
+    val res = contentFolderTableFormat.write(dynamoTable)
+    val resultMap = res.toAttributeValue.m().asScala
+
+    resultMap(batchId).s() should equal(batchId)
+    resultMap(id).s() should equal(uuid.toString)
+    resultMap(name).s() should equal(name)
+    resultMap(parentPath).s() should equal("parentPath")
+    resultMap(title).s() should equal("title")
+    resultMap(description).s() should equal("description")
+    resultMap(typeField).s() should equal("ContentFolder")
   }
 
   "filesTablePkFormat read" should "read the correct fields" in {
@@ -581,4 +624,16 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       Nil
     )
   }
+
+  private def generateContentFolderDynamoTable(uuid: UUID = UUID.randomUUID()): ContentFolderDynamoTable =
+    ContentFolderDynamoTable(
+      batchId,
+      uuid,
+      Option(parentPath),
+      name,
+      ContentFolder,
+      Option(title),
+      Option(description),
+      Nil
+    )
 }
