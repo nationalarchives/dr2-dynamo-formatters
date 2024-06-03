@@ -81,7 +81,8 @@ object DynamoFormatters {
   val representationSuffix = "representationSuffix"
   val ingestedPreservica = "ingested_PS"
 
-  given pkFormat: Typeclass[PartitionKey] = deriveDynamoFormat[PartitionKey]
+  given filesTablePkFormat: Typeclass[FilesTablePartitionKey] = deriveDynamoFormat[FilesTablePartitionKey]
+  given lockTablePkFormat: Typeclass[LockTablePartitionKey] = deriveDynamoFormat[LockTablePartitionKey]
 
   enum Type:
     case ArchiveFolder, ContentFolder, Asset, File
@@ -191,7 +192,8 @@ object DynamoFormatters {
 
   case class Identifier(identifierName: String, value: String)
 
-  case class PartitionKey(id: UUID)
+  case class FilesTablePartitionKey(id: UUID)
+  case class LockTablePartitionKey(ioId: UUID)
 
   case class IngestLockTable(ioId: UUID, batchId: String, message: String)
 

@@ -383,6 +383,21 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     folderRow.description.get should equal("description")
   }
 
+  "archiveFolderTableFormat write" should "write all mandatory fields and ignore any optional ones" in {
+    val uuid = UUID.randomUUID()
+    val dynamoTable = generateFolderDynamoTable(uuid)
+    val res = archiveFolderTableFormat.write(dynamoTable)
+    val resultMap = res.toAttributeValue.m().asScala
+
+    resultMap(batchId).s() should equal(batchId)
+    resultMap(id).s() should equal(uuid.toString)
+    resultMap(name).s() should equal(name)
+    resultMap(parentPath).s() should equal("parentPath")
+    resultMap(title).s() should equal("title")
+    resultMap(description).s() should equal("description")
+    resultMap(typeField).s() should equal("ArchiveFolder")
+  }
+
   "assetTableFormat write" should "write all mandatory fields and ignore any optional ones" in {
     val uuid = UUID.randomUUID()
     val originalFilesUuid = UUID.randomUUID()
@@ -423,17 +438,45 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       .forall(resultMap.contains) should be(false)
   }
 
-  "pkFormat read" should "read the correct fields" in {
+  "contentFolderTableFormat read" should "return a valid object when all folder fields are populated" in {
+    val folderRow = contentFolderTableFormat.read(buildAttributeValue(allFolderFieldsPopulated)).value
+
+    folderRow.batchId should equal("testBatchId")
+    folderRow.id should equal(UUID.fromString(allFolderFieldsPopulated(id).s()))
+    folderRow.parentPath.get should equal("testParentPath")
+    folderRow.name should equal("testName")
+    folderRow.`type` should equal(ArchiveFolder)
+    folderRow.title.get should equal("title")
+    folderRow.description.get should equal("description")
+    folderRow.identifiers should equal(List(Identifier("Test", "testIdentifier")))
+  }
+
+  "contentFolderTableFormat write" should "write all mandatory fields and ignore any optional ones" in {
+    val uuid = UUID.randomUUID()
+    val dynamoTable = generateContentFolderDynamoTable(uuid)
+    val res = contentFolderTableFormat.write(dynamoTable)
+    val resultMap = res.toAttributeValue.m().asScala
+
+    resultMap(batchId).s() should equal(batchId)
+    resultMap(id).s() should equal(uuid.toString)
+    resultMap(name).s() should equal(name)
+    resultMap(parentPath).s() should equal("parentPath")
+    resultMap(title).s() should equal("title")
+    resultMap(description).s() should equal("description")
+    resultMap(typeField).s() should equal("ContentFolder")
+  }
+
+  "filesTablePkFormat read" should "read the correct fields" in {
     val uuid = UUID.randomUUID()
     val input = fromM(Map(id -> fromS(uuid.toString)).asJava)
-    val res = pkFormat.read(input).value
+    val res = filesTablePkFormat.read(input).value
     res.id should equal(uuid)
   }
 
-  "pkFormat read" should "error if the field is missing" in {
+  "filesTablePkFormat read" should "error if the field is missing" in {
     val uuid = UUID.randomUUID()
     val input = fromM(Map("invalid" -> fromS(uuid.toString)).asJava)
-    val res = pkFormat.read(input)
+    val res = filesTablePkFormat.read(input)
     res.isLeft should be(true)
     val isMissingPropertyError = res.left.value.asInstanceOf[InvalidPropertiesError].errors.head._2 match {
       case MissingProperty => true
@@ -442,13 +485,13 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     isMissingPropertyError should be(true)
   }
 
-  "pkFormat write" should "write the correct fields" in {
+  "filesTablePkFormat write" should "write the correct fields" in {
     val uuid = UUID.randomUUID()
-    val attributeValueMap = pkFormat.write(PartitionKey(uuid)).toAttributeValue.m().asScala
+    val attributeValueMap = filesTablePkFormat.write(FilesTablePartitionKey(uuid)).toAttributeValue.m().asScala
     UUID.fromString(attributeValueMap(id).s()) should equal(uuid)
   }
 
-  "lockTable read" should "read the correct fields" in {
+  "ingestLockTableFormat read" should "read the correct fields" in {
     val ioId = UUID.randomUUID()
     val batchId = "batchId"
     val message = "{}"
@@ -461,7 +504,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     res.message should equal(res.message)
   }
 
-  "lockTable read" should "error if the field is missing" in {
+  "ingestLockTableFormat read" should "error if the field is missing" in {
     val ioId = UUID.randomUUID()
 
     val input = fromM(Map("invalidField" -> fromS(ioId.toString)).asJava)
@@ -474,7 +517,7 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     isMissingPropertyError should be(true)
   }
 
-  "lockTable write" should "write the correct fields" in {
+  "ingestLockTableFormat write" should "write the correct fields" in {
     val ioId = UUID.randomUUID()
     val batchId = "batchId"
     val message = "{}"
@@ -484,6 +527,31 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
     UUID.fromString(attributeValueMap("ioId").s()) should equal(ioId)
     attributeValueMap("batchId").s() should equal("batchId")
     attributeValueMap("message").s() should equal("{}")
+  }
+
+  "lockTablePkFormat read" should "read the correct fields" in {
+    val uuid = UUID.randomUUID()
+    val input = fromM(Map(ioId -> fromS(uuid.toString)).asJava)
+    val res = lockTablePkFormat.read(input).value
+    res.ioId should equal(uuid)
+  }
+
+  "lockTablePkFormat read" should "error if the field is missing" in {
+    val uuid = UUID.randomUUID()
+    val input = fromM(Map("invalid" -> fromS(uuid.toString)).asJava)
+    val res = lockTablePkFormat.read(input)
+    res.isLeft should be(true)
+    val isMissingPropertyError = res.left.value.asInstanceOf[InvalidPropertiesError].errors.head._2 match {
+      case MissingProperty => true
+      case _               => false
+    }
+    isMissingPropertyError should be(true)
+  }
+
+  "lockTablePkFormat write" should "write the correct fields" in {
+    val uuid = UUID.randomUUID()
+    val attributeValueMap = lockTablePkFormat.write(LockTablePartitionKey(uuid)).toAttributeValue.m().asScala
+    UUID.fromString(attributeValueMap(ioId).s()) should equal(uuid)
   }
 
   private def generateListAttributeValue(values: String*): AttributeValue =
@@ -556,4 +624,16 @@ class DynamoFormattersTest extends AnyFlatSpec with TableDrivenPropertyChecks wi
       Nil
     )
   }
+
+  private def generateContentFolderDynamoTable(uuid: UUID = UUID.randomUUID()): ContentFolderDynamoTable =
+    ContentFolderDynamoTable(
+      batchId,
+      uuid,
+      Option(parentPath),
+      name,
+      ContentFolder,
+      Option(title),
+      Option(description),
+      Nil
+    )
 }
